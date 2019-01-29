@@ -11,30 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace NTFSDuplicateLinker {
-	class Dll {
-		[StructLayout(LayoutKind.Sequential, Pack = 4)]
-		public struct BY_HANDLE_FILE_INFORMATION {
-			public uint FileAttributes;
-			public FILETIME CreationTime;
-			public FILETIME LastAccessTime;
-			public FILETIME LastWriteTime;
-			public uint VolumeSerialNumber;
-			public uint FileSizeHigh;
-			public uint FileSizeLow;
-			public uint NumberOfLinks;
-			public uint FileIndexHigh;
-			public uint FileIndexLow;
-		}
-		[DllImport("kernel32.dll")]
-		public static extern uint GetLastError();
-		[DllImport("Kernel32.dll", CharSet = CharSet.Auto)]
-		public static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
 
-		[DllImport("Kernel32.dll", CharSet = CharSet.Unicode)]
-		public static extern bool CreateHardLinkW(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
-		[DllImport("kernel32.dll", SetLastError = true)]
-		public static extern bool GetFileInformationByHandle(IntPtr hFile, out BY_HANDLE_FILE_INFORMATION lpFileInformation);
-	}
 	public partial class MainWindow : Window {
 		/// <summary>
 		/// Structure to contain a path and the file contents
@@ -67,7 +44,7 @@ namespace NTFSDuplicateLinker {
 			/// </summary>
 			public List<string> instances;
 			/// <summary>
-			/// 
+			///
 			/// </summary>
 			/// <param name="f">First file</param>
 			public DuplicateFile(NormalFile f) {
@@ -87,7 +64,7 @@ namespace NTFSDuplicateLinker {
 		/// Filepath and hash
 		/// </summary>
 		Dictionary<string, byte[]> hashedFiles;
-		
+
 		public MainWindow() {
 			InitializeComponent();
 		}
@@ -101,7 +78,7 @@ namespace NTFSDuplicateLinker {
 			/// </summary>
 			public readonly string filename;
 			/// <summary>
-			/// 
+			///
 			/// </summary>
 			/// <param name="fp">Path to the file</param>
 			public NormalFile(string fp) {
@@ -523,7 +500,7 @@ namespace NTFSDuplicateLinker {
 			return exp;
 		}
 		/// <summary>
-		/// Show all Duplicates in <see cref="MainWindow.spItems"/> 
+		/// Show all Duplicates in <see cref="MainWindow.spItems"/>
 		/// </summary>
 		/// <param name="ldf">All duplicates</param>
 		/// <returns></returns>
@@ -548,7 +525,7 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		List<DuplicateFile> finalDuplicates;
 		/// <summary>
-		/// Event für <see cref="btAnalyze"/> 
+		/// Event für <see cref="btAnalyze"/>
 		/// </summary>
 		/// <param name="sender"><see cref="btAnalyze"/></param>
 		private async void Button_Click(object sender, RoutedEventArgs e) {
