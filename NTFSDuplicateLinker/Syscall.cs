@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NTFSDuplicateLinker
 {
-    class Dll
+   static class Syscall
     {
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct BY_HANDLE_FILE_INFORMATION
