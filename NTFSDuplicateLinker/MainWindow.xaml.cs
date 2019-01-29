@@ -18,13 +18,13 @@ namespace NTFSDuplicateLinker {
 		public MainWindow() {
 			InitializeComponent();
 		}
-		
+
 		/// <summary>
 		/// true while Reader is running
 		/// </summary>
 		bool stillLoading = false;
-		
-		
+
+
 		/// <summary>
 		/// Independend Thread
 		/// Searches for files in a given folderstructure
@@ -85,7 +85,7 @@ namespace NTFSDuplicateLinker {
 			var access = (HandoverObject)obj;
 			using (var hasher = MD5.Create()) {
 				bool loadall = false;
-				while (stillLoading) {
+				while (stillLoading || access.queque.Count > 0) {
 					if (access.queque.Count > 0) {
 						var work = new WorkFile();
 						lock (access.queque) {
@@ -210,7 +210,7 @@ namespace NTFSDuplicateLinker {
 			}
 			running = 0;
 		}
-		
+
 		/// <summary>
 		/// Checks hashes of duplicates whether they are acutal duplicates
 		/// </summary>
@@ -253,7 +253,7 @@ namespace NTFSDuplicateLinker {
 					ret.Add(d);
 			return ret;
 		}
-	
+
 		/// <summary>
 		/// Do the linking of one file
 		/// Ensures that duplicate link limits are not exceeded
@@ -398,6 +398,7 @@ namespace NTFSDuplicateLinker {
 			btAnalyze.IsEnabled = false;
 			running = 1;
 			PBManager.Init(pbStatus, 7, 1);
+			Debug.WriteLine("Scanning...");
 			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(dir, filePaths));
 			while (running > 0) {
 				await Task.Delay(100);
@@ -405,6 +406,7 @@ namespace NTFSDuplicateLinker {
 			PBManager.MoveToNextAction(filePaths.Count);
 			var duplicates = new List<DuplicateFile>();
 			running = 1;
+			Debug.WriteLine("Identifying duplicates...");
 			ThreadPool.QueueUserWorkItem(
 				FindDuplicates,
 				new Tuple<List<DuplicateFile>, List<NormalFile>>(duplicates, filePaths));
@@ -412,6 +414,7 @@ namespace NTFSDuplicateLinker {
 				await Task.Delay(100);
 				PBManager.UpdateCurrentPosition(position);
 			}
+			Debug.WriteLine("Found:" + duplicates.Count + " duplicates in " + filePaths.Count + " Files");
 			PBManager.MoveToNextAction(duplicates.Count);
 			stillLoading = true;
 			ThreadPool.QueueUserWorkItem(MemoryMonitor);
@@ -423,7 +426,7 @@ namespace NTFSDuplicateLinker {
 				await Task.Delay(100);
 			}
 			await Task.Delay(500);
-
+			Debug.WriteLine("Computed:" + hashedFiles.Count + " Hashes!");
 			running = 1;
 			PBManager.MoveToNextAction(duplicates.Count);
 			ThreadPool.QueueUserWorkItem(Sortall, duplicates);
@@ -431,10 +434,13 @@ namespace NTFSDuplicateLinker {
 				PBManager.UpdateCurrentPosition(position);
 				await Task.Delay(100);
 			}
+			Debug.WriteLine("Sorted!");
 			PBManager.MoveToNextAction(1);
 			finalDuplicates = FinalDuplicates(duplicates);
+			Debug.WriteLine("Identified final Duplicates. found: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(1);
 			finalDuplicates = CleanupDuplicates(finalDuplicates);
+			Debug.WriteLine("Removed non-duplicates. final count: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(finalDuplicates.Count);
 			await DisplayDuplicates(finalDuplicates);
 			btLink.IsEnabled = true;
