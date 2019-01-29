@@ -1,0 +1,16 @@
+//todo
+[x]Ensure NTFS
+[X]Load all Files
+[X]Check Dirs for Junctios
+[X]Compare Filenames
+[X]Load Files
+[-]Check files for hardlink //Impossible and not needed
+[X]Compute Hashes Async
+[X]Compute Large Hash Sync
+[X]Compare Hashes
+[X]Check Hardlink number
+[X]Create Hardlinks
+[X]Remove old files
+[X]Acceptable UI
+[ ]Nice UI
+[ ]Sexy UI
