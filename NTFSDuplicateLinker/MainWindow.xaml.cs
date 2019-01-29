@@ -36,42 +36,82 @@ namespace NTFSDuplicateLinker {
 		public static extern bool GetFileInformationByHandle(IntPtr hFile, out BY_HANDLE_FILE_INFORMATION lpFileInformation);
 	}
 	public partial class MainWindow : Window {
+		/// <summary>
+		/// Structure to contain a path and the file contents
+		/// </summary>
 		struct WorkFile {
+			/// <summary>
+			/// File content
+			/// </summary>
 			public byte[] data;
 			public string path;
 		}
+		/// <summary>
+		/// Datastructure for theads to share memory
+		/// </summary>
 		struct HandoverObject {
 			public Dictionary<string, byte[]> results;
 			public Queue<WorkFile> queque;
 			public List<DuplicateFile> targets;
 		}
+		/// <summary>
+		/// Stores duplicates
+		/// </summary>
 		class DuplicateFile {
+			/// <summary>
+			/// Just the name and extension
+			/// </summary>
 			public readonly string filename;
+			/// <summary>
+			/// all known instances of this file
+			/// </summary>
 			public List<string> instances;
+			/// <summary>
+			/// 
+			/// </summary>
+			/// <param name="f">First file</param>
 			public DuplicateFile(NormalFile f) {
 				filename = f.filename;
 				instances = new List<string>() { f.fullpath };
 			}
+			/// <summary>
+			/// Sorts instances by <see cref="FileInfo.LastWriteTime"/>
+			/// </summary>
 			public void Sort() {
 				instances.Sort(delegate (string a, string b) {
 					return new FileInfo(a).LastWriteTime.CompareTo(new FileInfo(b).LastWriteTime);
 				});
 			}
 		}
+		/// <summary>
+		/// Filepath and hash
+		/// </summary>
 		Dictionary<string, byte[]> hashedFiles;
-		Queue<WorkFile> files;
+		
 		public MainWindow() {
 			InitializeComponent();
 		}
 		struct NormalFile {
-			public string fullpath;
-			public string filename;
+			/// <summary>
+			/// Path to the file
+			/// </summary>
+			public readonly string fullpath;
+			/// <summary>
+			/// Just the name of the file with extension
+			/// </summary>
+			public readonly string filename;
+			/// <summary>
+			/// 
+			/// </summary>
+			/// <param name="fp">Path to the file</param>
 			public NormalFile(string fp) {
 				fullpath = fp;
 				filename = Path.GetFileName(fp);
 			}
 		}
-
+		/// <summary>
+		/// true while Reader is running
+		/// </summary>
 		bool stillLoading = false;
 		/// <summary>
 		/// True if DirectoryInfo is Junction
@@ -88,7 +128,7 @@ namespace NTFSDuplicateLinker {
 		bool AnalyzeDirectoryForJunctions(string pathToDirectory) =>
 				AnalyzeDIForJunctions(new DirectoryInfo(pathToDirectory));
 		/// <summary>
-		/// 
+		/// Finds out wether a path is part of a Junction
 		/// </summary>
 		/// <param name="path"></param>
 		/// <returns>True if Path is contained in a Junction</returns>
@@ -103,6 +143,11 @@ namespace NTFSDuplicateLinker {
 			} while (dir != null);
 			return false;
 		}
+		/// <summary>
+		/// Independend Thread
+		/// Searches for files in a given folderstructure
+		/// </summary>
+		/// <param name="obj">Tuple<string, List<NormalFile>> Object containing </param>
 		void Discover(object obj) {
 			string currPath;
 			List<NormalFile> ret;
@@ -128,15 +173,32 @@ namespace NTFSDuplicateLinker {
 			}
 			running = 0;
 		}
+		/// <summary>
+		/// indicates how many Tasks are running
+		/// </summary>
 		int running = 0;
+		/// <summary>
+		/// Used for Tracking progress across Tasks
+		/// </summary>
 		int position = 0;
+		/// <summary>
+		/// Program memory usage in bits
+		/// </summary>
 		long usedMemory = 0;
+		/// <summary>
+		/// Monitors memory usage while running > 0
+		/// </summary>
+		/// <param name="nul">noting</param>
 		void MemoryMonitor(object nul) {
 			while (running > 0) {
 				usedMemory = GC.GetTotalMemory(false);
 				Task.Delay(250).Wait();
 			}
 		}
+		/// <summary>
+		/// Looks for Files in the Queue&lt;<see cref="WorkFile"/>&gt; and starts hashing them
+		/// </summary>
+		/// <param name="obj"><see cref="HandoverObject"/> containing the required references</param>
 		void HashAsync(object obj) {
 			var access = (HandoverObject)obj;
 			using (var hasher = MD5.Create()) {
@@ -177,6 +239,12 @@ namespace NTFSDuplicateLinker {
 			}
 			running--;
 		}
+		/// <summary>
+		/// Hashes very large files on the fly
+		/// MUCH SLOWER than async hashing.
+		/// </summary>
+		/// <param name="file">Path of the file to hash</param>
+		/// <param name="lst"><see cref="Dictionary{string,byte[]}"/> reference to all hashes</param>
 		void HashSync(string file, Dictionary<string, byte[]> lst) {
 			using (var hasher = MD5.Create()) {
 				using (var fs = File.OpenRead(file)) {
@@ -190,6 +258,10 @@ namespace NTFSDuplicateLinker {
 				}
 			}
 		}
+		/// <summary>
+		/// Loads all identified duplicates into Memory for hashing by <see cref="HashAsync(object)"/>
+		/// </summary>
+		/// <param name="obj"><see cref="HandoverObject"/> containing the required references</param>
 		void Reader(object obj) {
 			position = 0;
 			var access = (HandoverObject)obj;
@@ -222,6 +294,13 @@ namespace NTFSDuplicateLinker {
 			}
 			stillLoading = false;
 		}
+		/// <summary>
+		/// Analyze all normal files and find duplicate filenames
+		/// </summary>
+		/// <param name="transfer">
+		///		Tuple&lt;List&lt; <see cref="DuplicateFile"/>&gt;, List&lt; <see cref="NormalFile"/>&gt;&gt;
+		///		reference for searching and output
+		/// </param>
 		void FindDuplicates(object transfer) {
 			position = 0;
 			var trans = (Tuple<List<DuplicateFile>, List<NormalFile>>)transfer;
@@ -236,6 +315,10 @@ namespace NTFSDuplicateLinker {
 			}
 			running = 0;
 		}
+		/// <summary>
+		/// Sorts all <see cref="DuplicateFile.instances"/> of all <see cref="DuplicateFile"/>s using <see cref="DuplicateFile.Sort()"/>
+		/// </summary>
+		/// <param name="obj">List&lt;<see cref="DuplicateFile"/>&gt;</param>
 		void Sortall(object obj) {
 			var dups = (List<DuplicateFile>)obj;
 			position = 0;
@@ -245,6 +328,10 @@ namespace NTFSDuplicateLinker {
 			}
 			running = 0;
 		}
+		/// <summary>
+		/// Simply compares two <see cref="byte[]"/> because c# won't do it
+		/// </summary>
+		/// <returns></returns>
 		bool CompareByteArray(byte[] a, byte[] b) {
 			if (a == null || b == null)
 				return false;
@@ -255,6 +342,11 @@ namespace NTFSDuplicateLinker {
 					return false;
 			return true;
 		}
+		/// <summary>
+		/// Checks hashes of duplicates whether they are acutal duplicates
+		/// </summary>
+		/// <param name="duplicates"></param>
+		/// <returns></returns>
 		List<DuplicateFile> FinalDuplicates(List<DuplicateFile> duplicates) {
 			var ret = new List<DuplicateFile>();
 			foreach (var dup in duplicates) {
@@ -280,6 +372,11 @@ namespace NTFSDuplicateLinker {
 			}
 			return ret;
 		}
+		/// <summary>
+		/// Remove duplicates that have no more reverences
+		/// </summary>
+		/// <param name="ldf"></param>
+		/// <returns></returns>
 		List<DuplicateFile> CleanupDuplicates(List<DuplicateFile> ldf) {
 			var ret = new List<DuplicateFile>();
 			foreach (var d in ldf)
@@ -287,6 +384,11 @@ namespace NTFSDuplicateLinker {
 					ret.Add(d);
 			return ret;
 		}
+		/// <summary>
+		/// Gets the number of HardLinks of a given <paramref name="filePath"/>
+		/// </summary>
+		/// <param name="filePath">Path to the file</param>
+		/// <returns></returns>
 		static uint GetLinks(string filePath) {
 			//try {
 			using (var f = new FileStream(filePath, FileMode.Open, FileAccess.Read)) {
@@ -298,7 +400,17 @@ namespace NTFSDuplicateLinker {
 			//	return uint.MaxValue;
 			//}
 		}
+		/// <summary>
+		/// Gets the number of HardLinks of the first <see cref="DuplicateFile.instances"/> in <paramref name="df"/>
+		/// </summary>
+		/// <param name="df">DuplicateFile to analyze</param>
+		/// <returns></returns>
 		static uint GetLinks(DuplicateFile df) => GetLinks(df.instances[0]);
+		/// <summary>
+		/// Analyzes if a path is on a NTFS formatted drive
+		/// </summary>
+		/// <param name="path"></param>
+		/// <returns></returns>
 		static bool IsOnNTFS(string path) {
 			var drives = DriveInfo.GetDrives();
 			var inputDriveName = Path.GetPathRoot(new FileInfo(path).FullName).Substring(0, 3);
@@ -307,6 +419,11 @@ namespace NTFSDuplicateLinker {
 					return d.DriveFormat == "NTFS";
 			return false;
 		}
+		/// <summary>
+		/// Do the linking of one file
+		/// Ensures that duplicate link limits are not exceeded
+		/// </summary>
+		/// <param name="file">The DuplicateFile to link into one</param>
 		static void LinkDuplicates(DuplicateFile file) {
 			file.instances.Sort();
 			var newExtension = ".DVSLINKER.BAK";
@@ -349,7 +466,11 @@ namespace NTFSDuplicateLinker {
 				}
 			}
 		}
-
+		/// <summary>
+		/// Wrapper to link everything up
+		/// </summary>
+		/// <param name="duplicates">List of all duplicates to link</param>
+		/// <returns></returns>
 		async Task LinkAllDuplicates(List<DuplicateFile> duplicates) {
 			int last = 0;
 			for (long n = 0; n < duplicates.Count; n++) {
@@ -374,6 +495,12 @@ namespace NTFSDuplicateLinker {
 			}
 		}
 		*/
+		/// <summary>
+		///		Create a <see cref="Expander"/> containing this <see cref="DuplicateFile"/>
+		/// </summary>
+		/// <param name="df"><see cref="DuplicateFile"/> to display</param>
+		/// <param name="bg">Background color of the created <see cref="Expander"/></param>
+		/// <returns>A expander visualizing the Duplicate</returns>
 		Expander CreateEntry(DuplicateFile df, SolidColorBrush bg) {
 			hashedFiles.TryGetValue(df.instances[0], out var myhash);
 			var exp = new Expander() {
@@ -395,6 +522,11 @@ namespace NTFSDuplicateLinker {
 			exp.Content = mysp;
 			return exp;
 		}
+		/// <summary>
+		/// Show all Duplicates in <see cref="MainWindow.spItems"/> 
+		/// </summary>
+		/// <param name="ldf">All duplicates</param>
+		/// <returns></returns>
 		async Task DisplayDuplicates(List<DuplicateFile> ldf) {
 			bool switcher = true;
 			position = 0;
@@ -411,14 +543,21 @@ namespace NTFSDuplicateLinker {
 				}
 			}
 		}
+		/// <summary>
+		/// <see cref="List{}"/> containing every identified <see cref="DuplicateFile"/>
+		/// </summary>
 		List<DuplicateFile> finalDuplicates;
+		/// <summary>
+		/// Event für <see cref="btAnalyze"/> 
+		/// </summary>
+		/// <param name="sender"><see cref="btAnalyze"/></param>
 		private async void Button_Click(object sender, RoutedEventArgs e) {
 			btLink.IsEnabled = false;
 			var dir = tbPath.Text;
 			spItems.Children.Clear();
 			if (!IsOnNTFS(dir))
 				return;
-			files = new Queue<WorkFile>();
+			var files = new Queue<WorkFile>();
 			hashedFiles = new Dictionary<string, byte[]>();
 			var filePaths = new List<NormalFile>();
 			btAnalyze.IsEnabled = false;
@@ -466,7 +605,11 @@ namespace NTFSDuplicateLinker {
 			btLink.IsEnabled = true;
 			btAnalyze.IsEnabled = true;
 		}
-
+		/// <summary>
+		/// Event für <see cref="btLink"/>
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
 		private async void BtLink_Click(object sender, RoutedEventArgs e) {
 			btLink.IsEnabled = false;
 			btAnalyze.IsEnabled = false;
