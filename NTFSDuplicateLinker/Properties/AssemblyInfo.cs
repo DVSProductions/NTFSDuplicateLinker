@@ -10,7 +10,7 @@ using System.Windows;
 [assembly: AssemblyTitle("NTFSDuplicateLinker")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("DVSProductions")]
 [assembly: AssemblyProduct("NTFSDuplicateLinker")]
 [assembly: AssemblyCopyright("Copyright ©  2019")]
 [assembly: AssemblyTrademark("")]
