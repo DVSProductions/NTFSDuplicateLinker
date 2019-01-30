@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -8,7 +9,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Collections.ObjectModel;
 
 namespace NTFSDuplicateLinker {
 	public partial class MainWindow : Window {
@@ -37,9 +37,9 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		List<DuplicateFile> finalDuplicates;
 
-        //view model
+		//view model
 
-        ObservableCollection<DuplicateFile> duplicates_view = new ObservableCollection<DuplicateFile>();
+		ObservableCollection<DuplicateFile> duplicates_view = new ObservableCollection<DuplicateFile>();
 
 
 		/// <summary>
@@ -362,12 +362,12 @@ namespace NTFSDuplicateLinker {
 			exp.Content = mysp;
 			return exp;
 		}
-        /// <summary>
-        /// Show all Duplicates in <see cref="MainWindow.duplicatesListView"/>
-        /// </summary>
-        /// <param name="ldf">All duplicates</param>
-        /// <returns></returns>
-        async Task DisplayDuplicates(List<DuplicateFile> ldf) {
+		/// <summary>
+		/// Show all Duplicates in <see cref="MainWindow.duplicatesListView"/>
+		/// </summary>
+		/// <param name="ldf">All duplicates</param>
+		/// <returns></returns>
+		async Task DisplayDuplicates(List<DuplicateFile> ldf) {
 			bool switcher = true;
 			position = 0;
 			SolidColorBrush light = new SolidColorBrush(Colors.White), dark = new SolidColorBrush(Colors.LightGray);
@@ -381,9 +381,9 @@ namespace NTFSDuplicateLinker {
 					await Task.Delay(100);
 				}
 
-                duplicates_view.Add(df);
+				duplicates_view.Add(df);
 
-            }
+			}
 		}
 		/// <summary>
 		/// Launches all hashing and analyzing logic
@@ -391,7 +391,6 @@ namespace NTFSDuplicateLinker {
 		/// <param name="path">Path to analyze. Does not have to be null checked</param>
 		/// <returns></returns>
 		async Task Analyzer(string path) {
-              duplicates_view.Clear();
 			if (
 				string.IsNullOrWhiteSpace(path) ||
 				!Directory.Exists(path) ||
@@ -473,7 +472,7 @@ namespace NTFSDuplicateLinker {
 		//---------- LOGIC FOR UI ----------
 		public MainWindow() {
 			InitializeComponent();
-      duplicatesListView.ItemsSource = duplicates_view;
+			duplicatesListView.ItemsSource = duplicates_view;
 		}
 		/// <summary>
 		/// Event für <see cref="btAnalyze"/>
@@ -482,7 +481,7 @@ namespace NTFSDuplicateLinker {
 		private async void BtAnalyze_Click(object sender, RoutedEventArgs e) {
 			btLink.IsEnabled = false;
 			btAnalyze.IsEnabled = false;
-			spItems.Children.Clear();
+			duplicates_view.Clear();
 			await Analyzer(tbPath.Text);
 			btLink.IsEnabled = true;
 			btAnalyze.IsEnabled = true;
@@ -499,9 +498,9 @@ namespace NTFSDuplicateLinker {
 			pbStatus.Maximum = finalDuplicates.Count - 1;
 			await LinkAllDuplicates(finalDuplicates);
 
-            duplicates_view.Clear();
+			duplicates_view.Clear();
 
-            btAnalyze.IsEnabled = true;
+			btAnalyze.IsEnabled = true;
 		}
 	}
 }

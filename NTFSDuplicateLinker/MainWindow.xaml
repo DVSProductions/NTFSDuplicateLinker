@@ -27,7 +27,7 @@
                 </ListView.ItemTemplate>
             </ListView>
         </ScrollViewer>
-        <Button x:Name="btAnalyze" Content="Analyze" VerticalAlignment="Top" Click="Button_Click" Height="27" HorizontalAlignment="Right" Width="85"/>
+        <Button x:Name="btAnalyze" Content="Analyze" VerticalAlignment="Top" Click="BtAnalyze_Click" Height="27" HorizontalAlignment="Right" Width="85"/>
         <ProgressBar x:Name="pbStatus" Margin="0,0,90,0" Height="41" VerticalAlignment="Bottom"></ProgressBar>
         <Button x:Name="btLink" IsEnabled="False" Click="BtLink_Click" Height="41" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="90">Link!</Button>
     </Grid>
