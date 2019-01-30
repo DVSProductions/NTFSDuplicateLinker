@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Collections.ObjectModel;
 
 namespace NTFSDuplicateLinker {
 	public partial class MainWindow : Window {
@@ -17,12 +18,19 @@ namespace NTFSDuplicateLinker {
 		Dictionary<string, byte[]> hashedFiles;
 		public MainWindow() {
 			InitializeComponent();
-		}
+            duplicatesListView.ItemsSource = duplicates_view;
+
+        }
 
 		/// <summary>
 		/// true while Reader is running
 		/// </summary>
 		bool stillLoading = false;
+
+
+        //view model
+
+        ObservableCollection<DuplicateFile> duplicates_view = new ObservableCollection<DuplicateFile>();
 
 
 		/// <summary>
@@ -357,12 +365,12 @@ namespace NTFSDuplicateLinker {
 			exp.Content = mysp;
 			return exp;
 		}
-		/// <summary>
-		/// Show all Duplicates in <see cref="MainWindow.spItems"/>
-		/// </summary>
-		/// <param name="ldf">All duplicates</param>
-		/// <returns></returns>
-		async Task DisplayDuplicates(List<DuplicateFile> ldf) {
+        /// <summary>
+        /// Show all Duplicates in <see cref="MainWindow.duplicatesListView"/>
+        /// </summary>
+        /// <param name="ldf">All duplicates</param>
+        /// <returns></returns>
+        async Task DisplayDuplicates(List<DuplicateFile> ldf) {
 			bool switcher = true;
 			position = 0;
 			SolidColorBrush light = new SolidColorBrush(Colors.White), dark = new SolidColorBrush(Colors.LightGray);
@@ -370,13 +378,15 @@ namespace NTFSDuplicateLinker {
 			foreach (var df in ldf) {
 				position++;
 				switcher = !switcher;
-				spItems.Children.Add(CreateEntry(df, switcher ? dark : light));
 				if (((position * 100L) / ldf.Count) >= next) {
 					next += 10;
 					PBManager.UpdateCurrentPosition(position);
 					await Task.Delay(100);
 				}
-			}
+
+                duplicates_view.Add(df);
+
+            }
 		}
 		/// <summary>
 		/// <see cref="List{}"/> containing every identified <see cref="DuplicateFile"/>
@@ -389,8 +399,8 @@ namespace NTFSDuplicateLinker {
 		private async void Button_Click(object sender, RoutedEventArgs e) {
 			btLink.IsEnabled = false;
 			var dir = tbPath.Text;
-			spItems.Children.Clear();
-			if (!Util.IsOnNTFS(dir))
+            duplicates_view.Clear();
+            if (!Util.IsOnNTFS(dir))
 				return;
 			var files = new Queue<WorkFile>();
 			hashedFiles = new Dictionary<string, byte[]>();
@@ -457,8 +467,10 @@ namespace NTFSDuplicateLinker {
 			pbStatus.Value = 0;
 			pbStatus.Maximum = finalDuplicates.Count - 1;
 			await LinkAllDuplicates(finalDuplicates);
-			spItems.Children.Clear();
-			btAnalyze.IsEnabled = true;
+
+            duplicates_view.Clear();
+
+            btAnalyze.IsEnabled = true;
 		}
 	}
 }
