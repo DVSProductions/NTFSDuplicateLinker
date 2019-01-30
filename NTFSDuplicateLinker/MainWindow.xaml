@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:NTFSDuplicateLinker"
         mc:Ignorable="d"
         Title="DVSProductions FileLinker" Height="450" Width="800">
-    <Grid>
+   <Grid>
         <Label>Path:</Label>
         <TextBox x:Name="tbPath" Margin="41,0,90,0" Height="27" VerticalAlignment="Top"/>
         <ScrollViewer Margin="0,32,0,41">
