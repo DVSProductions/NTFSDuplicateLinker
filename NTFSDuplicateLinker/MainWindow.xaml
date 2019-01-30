@@ -6,14 +6,29 @@
         xmlns:local="clr-namespace:NTFSDuplicateLinker"
         mc:Ignorable="d"
         Title="DVSProductions FileLinker" Height="450" Width="800">
-	<Grid>
-		<Label>Path:</Label>
-		<TextBox x:Name="tbPath" Margin="41,0,90,0" Height="27" VerticalAlignment="Top"/>
-		<ScrollViewer Margin="0,32,0,41">
-			<StackPanel x:Name="spItems"/>
-		</ScrollViewer>
-		<Button x:Name="btAnalyze" Content="Analyze" VerticalAlignment="Top" Click="Button_Click" Height="27" HorizontalAlignment="Right" Width="85"/>
-		<ProgressBar x:Name="pbStatus" Margin="0,0,90,0" Height="41" VerticalAlignment="Bottom"></ProgressBar>
-		<Button x:Name="btLink" IsEnabled="False" Click="BtLink_Click" Height="41" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="90">Link!</Button>
-	</Grid>
+    <Grid>
+        <Label>Path:</Label>
+        <TextBox x:Name="tbPath" Margin="41,0,90,0" Height="27" VerticalAlignment="Top"/>
+        <ScrollViewer Margin="0,32,0,41">
+            <ListView x:Name="duplicatesListView" Margin="10">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <WrapPanel>
+                            <CheckBox IsChecked="{Binding Deduplicate}"/>
+                            <Expander Header="{Binding Filename}" Content="{Binding Instances}"  >
+                                <Expander.ContentTemplate >
+                                    <DataTemplate >
+                                        <ListView ItemsSource="{Binding}"/>
+                                    </DataTemplate>
+                                </Expander.ContentTemplate>
+                            </Expander>
+                        </WrapPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </ScrollViewer>
+        <Button x:Name="btAnalyze" Content="Analyze" VerticalAlignment="Top" Click="Button_Click" Height="27" HorizontalAlignment="Right" Width="85"/>
+        <ProgressBar x:Name="pbStatus" Margin="0,0,90,0" Height="41" VerticalAlignment="Bottom"></ProgressBar>
+        <Button x:Name="btLink" IsEnabled="False" Click="BtLink_Click" Height="41" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="90">Link!</Button>
+    </Grid>
 </Window>

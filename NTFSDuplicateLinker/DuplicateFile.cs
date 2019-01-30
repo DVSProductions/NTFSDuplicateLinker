@@ -10,10 +10,22 @@ namespace NTFSDuplicateLinker {
 		/// Just the name and extension
 		/// </summary>
 		public readonly string filename;
+        public string Filename
+        {
+            get { return filename;  }
+        }
+
+        public bool Deduplicate {  get;  set; }
+
 		/// <summary>
 		/// all known instances of this file
 		/// </summary>
 		public List<string> instances;
+        public List<string> Instances {
+            get {
+                return instances;
+            }
+        }
 		/// <summary>
 		///
 		/// </summary>
