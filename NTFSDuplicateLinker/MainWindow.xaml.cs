@@ -13,20 +13,29 @@ using System.Collections.ObjectModel;
 namespace NTFSDuplicateLinker {
 	public partial class MainWindow : Window {
 		/// <summary>
-		/// Filepath and hash
-		/// </summary>
-		Dictionary<string, byte[]> hashedFiles;
-		public MainWindow() {
-			InitializeComponent();
-            duplicatesListView.ItemsSource = duplicates_view;
-
-        }
-
-		/// <summary>
 		/// true while Reader is running
 		/// </summary>
 		bool stillLoading = false;
-
+		/// <summary>
+		/// indicates how many Tasks are running
+		/// </summary>
+		int running = 0;
+		/// <summary>
+		/// Used for Tracking progress across Tasks
+		/// </summary>
+		int position = 0;
+		/// <summary>
+		/// Program memory usage in bits
+		/// </summary>
+		long usedMemory = 0;
+		/// <summary>
+		/// Filepath and hash
+		/// </summary>
+		Dictionary<string, byte[]> hashedFiles;
+		/// <summary>
+		/// <see cref="List{}"/> containing every identified <see cref="DuplicateFile"/>
+		/// </summary>
+		List<DuplicateFile> finalDuplicates;
 
         //view model
 
@@ -63,27 +72,17 @@ namespace NTFSDuplicateLinker {
 			}
 			running = 0;
 		}
-		/// <summary>
-		/// indicates how many Tasks are running
-		/// </summary>
-		int running = 0;
-		/// <summary>
-		/// Used for Tracking progress across Tasks
-		/// </summary>
-		int position = 0;
-		/// <summary>
-		/// Program memory usage in bits
-		/// </summary>
-		long usedMemory = 0;
+
 		/// <summary>
 		/// Monitors memory usage while running > 0
 		/// </summary>
 		/// <param name="nul">noting</param>
 		void MemoryMonitor(object nul) {
-			while (running > 0) {
+			while (running > 1) {
 				usedMemory = GC.GetTotalMemory(false);
-				Task.Delay(250).Wait();
+				Task.Delay(Config.MEMORYMONITORDELAY).Wait();
 			}
+			running--;
 		}
 		/// <summary>
 		/// Looks for Files in the Queue&lt;<see cref="WorkFile"/>&gt; and starts hashing them
@@ -92,7 +91,7 @@ namespace NTFSDuplicateLinker {
 		void HashAsync(object obj) {
 			var access = (HandoverObject)obj;
 			using (var hasher = MD5.Create()) {
-				bool loadall = false;
+				bool panic = false;
 				while (stillLoading || access.queque.Count > 0) {
 					if (access.queque.Count > 0) {
 						var work = new WorkFile();
@@ -107,23 +106,23 @@ namespace NTFSDuplicateLinker {
 									access.results.Add(work.path, dat);
 							}
 						}
-						if (!loadall && usedMemory > 2000000000L) {
-							loadall = true;
+						if (!panic && usedMemory > Config.MAXMEMORYUSAGE) {
+							panic = true;
 						}
-						else if (loadall && usedMemory < 400000000L) {//400.000.000 400mb
-							loadall = false;
+						else if (panic && usedMemory < Config.MINMEMORYUSAGE) {//400.000.000 400mb
+							panic = false;
 						}
-						else if (usedMemory < 1000000000L && stillLoading && !loadall) {//1.000.000.00
-							Task.Delay(100).Wait();
+						else if (!panic && usedMemory < Config.OKMEMORYUSAGE && stillLoading) {//1.000.000.00
+							Task.Delay(Config.HASHASYNCREGDELAY).Wait();
 						}
-						else if (stillLoading && !loadall) {//1.000.000.00
-							Task.Delay(10).Wait();
+						else if (!panic && stillLoading) {
+							Task.Delay(Config.HASHASYNCNOTOKDELAY).Wait();
 						}
 
 					}
 					else {
 						GC.Collect();
-						Task.Delay(100).Wait();
+						Task.Delay(Config.HASHASYNCREGDELAY).Wait();
 					}
 				}
 			}
@@ -160,7 +159,7 @@ namespace NTFSDuplicateLinker {
 				foreach (var file in dup.instances) {
 					//check for huge size
 					var fi = new FileInfo(file);
-					if (fi.Length > 1000000000L) {
+					if (fi.Length > Config.MAXIMUMASYNCFILESIZE) {
 						HashSync(file, access.results);
 					}
 					else {
@@ -218,7 +217,6 @@ namespace NTFSDuplicateLinker {
 			}
 			running = 0;
 		}
-
 		/// <summary>
 		/// Checks hashes of duplicates whether they are acutal duplicates
 		/// </summary>
@@ -261,7 +259,6 @@ namespace NTFSDuplicateLinker {
 					ret.Add(d);
 			return ret;
 		}
-
 		/// <summary>
 		/// Do the linking of one file
 		/// Ensures that duplicate link limits are not exceeded
@@ -389,32 +386,32 @@ namespace NTFSDuplicateLinker {
             }
 		}
 		/// <summary>
-		/// <see cref="List{}"/> containing every identified <see cref="DuplicateFile"/>
+		/// Launches all hashing and analyzing logic
 		/// </summary>
-		List<DuplicateFile> finalDuplicates;
-		/// <summary>
-		/// Event für <see cref="btAnalyze"/>
-		/// </summary>
-		/// <param name="sender"><see cref="btAnalyze"/></param>
-		private async void Button_Click(object sender, RoutedEventArgs e) {
-			btLink.IsEnabled = false;
-			var dir = tbPath.Text;
-            duplicates_view.Clear();
-            if (!Util.IsOnNTFS(dir))
+		/// <param name="path">Path to analyze. Does not have to be null checked</param>
+		/// <returns></returns>
+		async Task Analyzer(string path) {
+              duplicates_view.Clear();
+			if (
+				string.IsNullOrWhiteSpace(path) ||
+				!Directory.Exists(path) ||
+				!Util.IsOnNTFS(path)
+				)
 				return;
 			var files = new Queue<WorkFile>();
-			hashedFiles = new Dictionary<string, byte[]>();
 			var filePaths = new List<NormalFile>();
-			btAnalyze.IsEnabled = false;
+			var duplicates = new List<DuplicateFile>();
+			hashedFiles = new Dictionary<string, byte[]>();
+
 			running = 1;
 			PBManager.Init(pbStatus, 7, 1);
 			Debug.WriteLine("Scanning...");
-			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(dir, filePaths));
+			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(path, filePaths));
 			while (running > 0) {
 				await Task.Delay(100);
 			}
 			PBManager.MoveToNextAction(filePaths.Count);
-			var duplicates = new List<DuplicateFile>();
+
 			running = 1;
 			Debug.WriteLine("Identifying duplicates...");
 			ThreadPool.QueueUserWorkItem(
@@ -426,19 +423,35 @@ namespace NTFSDuplicateLinker {
 			}
 			Debug.WriteLine("Found:" + duplicates.Count + " duplicates in " + filePaths.Count + " Files");
 			PBManager.MoveToNextAction(duplicates.Count);
+
 			stillLoading = true;
+			running = 1;
 			ThreadPool.QueueUserWorkItem(MemoryMonitor);
-			ThreadPool.QueueUserWorkItem(Reader, new HandoverObject() { queque = files, targets = duplicates, results = hashedFiles });
-			for (int n = 0; n < 4; n++, running++)
-				ThreadPool.QueueUserWorkItem(HashAsync, new HandoverObject() { queque = files, targets = duplicates, results = hashedFiles });
+			ThreadPool.QueueUserWorkItem(
+				Reader,
+				new HandoverObject() {
+					queque = files,
+					targets = duplicates,
+					results = hashedFiles
+				}
+			);
+			for (short n = 0; n < Config.HASHTHREADS; n++, running++)
+				ThreadPool.QueueUserWorkItem(
+					HashAsync,
+					new HandoverObject() {
+						queque = files,
+						targets = duplicates,
+						results = hashedFiles
+					}
+				);
 			while (running > 0) {
 				PBManager.UpdateCurrentPosition(position);
 				await Task.Delay(100);
 			}
-			await Task.Delay(500);
 			Debug.WriteLine("Computed:" + hashedFiles.Count + " Hashes!");
 			running = 1;
 			PBManager.MoveToNextAction(duplicates.Count);
+
 			ThreadPool.QueueUserWorkItem(Sortall, duplicates);
 			while (running > 0) {
 				PBManager.UpdateCurrentPosition(position);
@@ -446,13 +459,31 @@ namespace NTFSDuplicateLinker {
 			}
 			Debug.WriteLine("Sorted!");
 			PBManager.MoveToNextAction(1);
+
 			finalDuplicates = FinalDuplicates(duplicates);
 			Debug.WriteLine("Identified final Duplicates. found: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(1);
+
 			finalDuplicates = CleanupDuplicates(finalDuplicates);
 			Debug.WriteLine("Removed non-duplicates. final count: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(finalDuplicates.Count);
 			await DisplayDuplicates(finalDuplicates);
+		}
+
+		//---------- LOGIC FOR UI ----------
+		public MainWindow() {
+			InitializeComponent();
+      duplicatesListView.ItemsSource = duplicates_view;
+		}
+		/// <summary>
+		/// Event für <see cref="btAnalyze"/>
+		/// </summary>
+		/// <param name="sender"><see cref="btAnalyze"/></param>
+		private async void BtAnalyze_Click(object sender, RoutedEventArgs e) {
+			btLink.IsEnabled = false;
+			btAnalyze.IsEnabled = false;
+			spItems.Children.Clear();
+			await Analyzer(tbPath.Text);
 			btLink.IsEnabled = true;
 			btAnalyze.IsEnabled = true;
 		}

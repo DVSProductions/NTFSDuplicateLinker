@@ -59,6 +59,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Config.cs" />
     <Compile Include="DuplicateFile.cs" />
     <Compile Include="HandoverObject.cs" />
     <Compile Include="NormalFile.cs" />
