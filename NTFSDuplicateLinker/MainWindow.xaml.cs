@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace NTFSDuplicateLinker {
@@ -336,33 +335,6 @@ namespace NTFSDuplicateLinker {
 		}
 		*/
 		/// <summary>
-		///		Create a <see cref="Expander"/> containing this <see cref="DuplicateFile"/>
-		/// </summary>
-		/// <param name="df"><see cref="DuplicateFile"/> to display</param>
-		/// <param name="bg">Background color of the created <see cref="Expander"/></param>
-		/// <returns>A expander visualizing the Duplicate</returns>
-		Expander CreateEntry(DuplicateFile df, SolidColorBrush bg) {
-			hashedFiles.TryGetValue(df.instances[0], out var myhash);
-			var exp = new Expander() {
-				Header = df.filename + "\t(" + (myhash == null ? "NULL" : Convert.ToBase64String(myhash)) + ")",
-				Background = bg,
-				BorderBrush = null
-			};
-			var mysp = new StackPanel();
-			foreach (var path in df.instances) {
-				mysp.Children.Add(
-					new TextBox() {
-						BorderBrush = null,
-						Background = null,
-						IsReadOnly = true,
-						IsReadOnlyCaretVisible = false,
-						Text = String.IsNullOrEmpty(path) ? "NULL" : path
-					});
-			}
-			exp.Content = mysp;
-			return exp;
-		}
-		/// <summary>
 		/// Show all Duplicates in <see cref="MainWindow.duplicatesListView"/>
 		/// </summary>
 		/// <param name="ldf">All duplicates</param>
@@ -370,20 +342,25 @@ namespace NTFSDuplicateLinker {
 		async Task DisplayDuplicates(List<DuplicateFile> ldf) {
 			bool switcher = true;
 			position = 0;
-			SolidColorBrush light = new SolidColorBrush(Colors.White), dark = new SolidColorBrush(Colors.LightGray);
-			int next = 0;
+			long next = 0;
+			var s = Stopwatch.StartNew();
 			foreach (var df in ldf) {
 				position++;
 				switcher = !switcher;
-				if (((position * 100L) / ldf.Count) >= next) {
-					next += 10;
-					PBManager.UpdateCurrentPosition(position);
-					await Task.Delay(100);
-				}
-
+				hashedFiles.TryGetValue(df.instances[0], out var myhash);
+				df.finalhash = myhash;
 				duplicates_view.Add(df);
-
+				if (s.ElapsedMilliseconds / 1000 >= next) {
+					next = (s.ElapsedMilliseconds / 1000) + 1;
+					PBManager.UpdateCurrentPosition(position);
+					await Task.Delay(33);
+				}
 			}
+			PBManager.UpdateCurrentPosition(position);
+		}
+		void DisplayError(bool error) {
+			tbPath.BorderBrush = error ? new SolidColorBrush(Colors.Red) : new SolidColorBrush(Colors.Gray);
+			tbPath.BorderThickness = error ? new Thickness(2) : new Thickness(1);
 		}
 		/// <summary>
 		/// Launches all hashing and analyzing logic
@@ -395,8 +372,11 @@ namespace NTFSDuplicateLinker {
 				string.IsNullOrWhiteSpace(path) ||
 				!Directory.Exists(path) ||
 				!Util.IsOnNTFS(path)
-				)
+				) {
+				DisplayError(true);
 				return;
+			}
+			DisplayError(false);
 			var files = new Queue<WorkFile>();
 			var filePaths = new List<NormalFile>();
 			var duplicates = new List<DuplicateFile>();
@@ -467,6 +447,7 @@ namespace NTFSDuplicateLinker {
 			Debug.WriteLine("Removed non-duplicates. final count: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(finalDuplicates.Count);
 			await DisplayDuplicates(finalDuplicates);
+			btLink.IsEnabled = true;
 		}
 
 		//---------- LOGIC FOR UI ----------
@@ -480,11 +461,12 @@ namespace NTFSDuplicateLinker {
 		/// <param name="sender"><see cref="btAnalyze"/></param>
 		private async void BtAnalyze_Click(object sender, RoutedEventArgs e) {
 			btLink.IsEnabled = false;
+			tbPath.IsReadOnly = true;
 			btAnalyze.IsEnabled = false;
 			duplicates_view.Clear();
 			await Analyzer(tbPath.Text);
-			btLink.IsEnabled = true;
 			btAnalyze.IsEnabled = true;
+			tbPath.IsReadOnly = false;
 		}
 		/// <summary>
 		/// Event für <see cref="btLink"/>
@@ -497,9 +479,7 @@ namespace NTFSDuplicateLinker {
 			pbStatus.Value = 0;
 			pbStatus.Maximum = finalDuplicates.Count - 1;
 			await LinkAllDuplicates(finalDuplicates);
-
 			duplicates_view.Clear();
-
 			btAnalyze.IsEnabled = true;
 		}
 	}

@@ -12,7 +12,7 @@ namespace NTFSDuplicateLinker {
 		public readonly string filename;
         public string Filename
         {
-            get { return filename;  }
+            get => filename;
         }
 
         public bool Deduplicate {  get;  set; }
@@ -26,9 +26,10 @@ namespace NTFSDuplicateLinker {
                 return instances;
             }
         }
-		/// <summary>
-		///
-		/// </summary>
+		public byte[] finalhash;
+		public string DisplayText {
+			get => filename + "\t(" + (finalhash == null ? "NULL" : System.Convert.ToBase64String(finalhash)) + ")";
+		}
 		/// <param name="f">First file</param>
 		public DuplicateFile(NormalFile f) {
 			filename = f.filename;
