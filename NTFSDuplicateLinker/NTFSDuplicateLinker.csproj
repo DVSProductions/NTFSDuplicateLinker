@@ -64,6 +64,7 @@
     <Compile Include="HandoverObject.cs" />
     <Compile Include="NormalFile.cs" />
     <Compile Include="Syscall.cs" />
+    <Compile Include="TextBlockAnimator.cs" />
     <Compile Include="Util.cs" />
     <Compile Include="WorkFile.cs" />
     <Page Include="MainWindow.xaml">
