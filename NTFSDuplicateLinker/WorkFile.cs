@@ -7,6 +7,9 @@
 		/// File content
 		/// </summary>
 		public byte[] data;
-		public string path;
+		/// <summary>
+		/// ID to path in <see cref="MainWindow.pathStorage"/>
+		/// </summary>
+		public int pathID;
 	}
 }

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace NTFSDuplicateLinker {
+﻿namespace NTFSDuplicateLinker {
 	public partial class MainWindow {
 		/// <summary>
 		/// Does calculations for the Progressbar
@@ -76,7 +74,7 @@ namespace NTFSDuplicateLinker {
 					currentValue *= (double)currentAction / (double)totalActions;
 					currentValue += ((currentAction * 100) / totalActions) / 100.0d;
 					bar.Value = currentValue;
-					Debug.WriteLine(currentState + " / " + currentTarget + " = " + currentValue);
+					//Debug.WriteLine(currentState + " / " + currentTarget + " = " + currentValue);
 				}
 			}
 		}

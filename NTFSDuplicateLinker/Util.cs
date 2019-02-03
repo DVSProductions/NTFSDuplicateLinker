@@ -67,7 +67,7 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <param name="df">DuplicateFile to analyze</param>
 		/// <returns></returns>
-		public static uint GetLinks(DuplicateFile df) => GetLinks(df.instances[0]);
+		public static uint GetLinks(DuplicateFile df) => GetLinks(MainWindow.pathStorage[df.instances[0]]);
 		/// <summary>
 		/// Analyzes if a path is on a NTFS formatted drive
 		/// </summary>

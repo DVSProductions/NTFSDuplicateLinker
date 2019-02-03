@@ -20,10 +20,13 @@ namespace NTFSDuplicateLinker {
 		/// <summary>
 		/// all known instances of this file
 		/// </summary>
-		public List<string> instances;
-        public List<string> Instances {
+		public List<int> instances;
+        public string[] Instances {
             get {
-                return instances;
+				var ret = new string [instances.Count];
+				for(int n=0,ln= instances.Count; n<ln;n++)
+					ret[n] = MainWindow.pathStorage[instances[n]];
+				return ret;
             }
         }
 		public byte[] finalhash;
@@ -33,14 +36,14 @@ namespace NTFSDuplicateLinker {
 		/// <param name="f">First file</param>
 		public DuplicateFile(NormalFile f) {
 			filename = f.filename;
-			instances = new List<string>() { f.fullpath };
+			instances = new List<int>() { f.fullpathID };
 		}
 		/// <summary>
 		/// Sorts instances by <see cref="FileInfo.LastWriteTime"/>
 		/// </summary>
 		public void Sort() {
-			instances.Sort(delegate (string a, string b) {
-				return new FileInfo(a).LastWriteTime.CompareTo(new FileInfo(b).LastWriteTime);
+			instances.Sort(delegate (int a, int b) {
+				return new FileInfo(MainWindow.pathStorage[a]).LastWriteTime.CompareTo(new FileInfo(MainWindow.pathStorage[b]).LastWriteTime);
 			});
 		}
 	}

@@ -6,14 +6,15 @@ namespace NTFSDuplicateLinker {
 		private TextBlock tb;
 		private readonly string orig;
 		bool run;
+		public bool showLeft = true, showRight = true;
 		private static string Reverse(string inp) {
 			var ret = inp.ToCharArray();
 			for (int ln = inp.Length - 1, n = ln; n >= 0; n--)
 				ret[n - ln] = inp[n];
 			return new string(ret);
 		}
-		private readonly string animationFramesL = "|/-\\";
-		private readonly string animationFramesR = "|\\-/";
+		private readonly string animationFramesL = @"|/-\";
+		private readonly string animationFramesR = @"|\-/";
 		public TextBlockAnimator(TextBlock textBlock) {
 			tb = textBlock;
 			orig = textBlock.Text;
@@ -48,8 +49,7 @@ namespace NTFSDuplicateLinker {
 				if (++idx >= len)
 					idx = 0;
 				int ipos = len - idx - 1;
-				string print = " " + animationFramesL[idx] + newMessage + animationFramesR[idx];
-				tb.Text = print;
+				tb.Text = (showLeft ? "" + animationFramesL[idx] : "") + newMessage + (showRight ? "" + animationFramesR[idx] : "");
 				await Task.Delay(1000 / (len * 2));
 			}
 		}

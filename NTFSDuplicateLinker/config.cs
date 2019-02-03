@@ -30,8 +30,7 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		/// Allows for a more responsive UI and fewer lock Instructions while loading and memory is below <see cref="OKMEMORYUSAGE"/>
 		/// </summary>
-		public static readonly long OKMEMORYUSAGE = 1000000000L;
-		
+		public static readonly long OKMEMORYUSAGE = 1000000000L;		
 		/// <summary>
 		/// Polling frequency of <see cref="MainWindow.MemoryMonitor(object)"/>
 		/// <para>

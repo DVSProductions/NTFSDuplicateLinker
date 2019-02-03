@@ -27,10 +27,11 @@ namespace NTFSDuplicateLinker {
 		/// Program memory usage in bits
 		/// </summary>
 		long usedMemory = 0;
+		public static List<string> pathStorage;
 		/// <summary>
-		/// Filepath and hash
+		/// FilepathID and hash
 		/// </summary>
-		Dictionary<string, byte[]> hashedFiles;
+		Dictionary<int, byte[]> hashedFiles;
 		/// <summary>
 		/// <see cref="List{}"/> containing every identified <see cref="DuplicateFile"/>
 		/// </summary>
@@ -56,6 +57,7 @@ namespace NTFSDuplicateLinker {
 			}
 			var dirs = new Queue<string>();
 			dirs.Enqueue(currPath);
+			int idx = 0;
 			while (dirs.Count > 0) {
 				string work = dirs.Dequeue();
 				try {
@@ -63,8 +65,11 @@ namespace NTFSDuplicateLinker {
 						if (!Util.AnalyzePathForJunctions(d))
 							dirs.Enqueue(d);
 
-					foreach (var fp in Directory.EnumerateFiles(work))
-						ret.Add(new NormalFile(fp));
+					foreach (var fp in Directory.EnumerateFiles(work)) {
+						pathStorage.Add(fp);
+						ret.Add(new NormalFile(fp,idx++));
+						position++;
+					}
 				}
 				catch {
 				}
@@ -93,16 +98,16 @@ namespace NTFSDuplicateLinker {
 				bool panic = false;
 				while (stillLoading || access.queque.Count > 0) {
 					if (access.queque.Count > 0) {
-						var work = new WorkFile();
+						var work = new WorkFile() { pathID = -1 };
 						lock (access.queque) {
 							if (access.queque.Count > 0)
 								work = access.queque.Dequeue();
 						}
-						if (work.path != null) {
+						if (work.pathID != -1) {
 							var dat = hasher.ComputeHash(work.data);
 							lock (access.results) {
-								if (!access.results.ContainsKey(work.path))
-									access.results.Add(work.path, dat);
+								if (!access.results.ContainsKey(work.pathID))
+									access.results.Add(work.pathID, dat);
 							}
 						}
 						if (!panic && usedMemory > Config.MAXMEMORYUSAGE) {
@@ -133,15 +138,15 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <param name="file">Path of the file to hash</param>
 		/// <param name="lst"><see cref="Dictionary{string,byte[]}"/> reference to all hashes</param>
-		static void HashSync(string file, Dictionary<string, byte[]> lst) {
+		static void HashSync(string file,int id, Dictionary<int, byte[]> lst) {
 			using (var hasher = MD5.Create()) {
 				using (var fs = File.OpenRead(file)) {
 					if (fs.Length == 0)
 						return;
 					var hash = hasher.ComputeHash(fs);
 					lock (lst) {
-						if (!lst.ContainsKey(file))
-							lst.Add(file, hash);
+						if (!lst.ContainsKey(id))
+							lst.Add(id, hash);
 					}
 				}
 			}
@@ -156,17 +161,18 @@ namespace NTFSDuplicateLinker {
 			foreach (var dup in access.targets) {
 				position++;
 				foreach (var file in dup.instances) {
+					var path = pathStorage[file];
 					//check for huge size
-					var fi = new FileInfo(file);
+					var fi = new FileInfo(path);
 					if (fi.Length > Config.MAXIMUMASYNCFILESIZE) {
-						HashSync(file, access.results);
+						HashSync(path,file, access.results);
 					}
 					else {
 						var wf = new WorkFile();
 						try {
 							wf = new WorkFile() {
-								data = File.ReadAllBytes(file),
-								path = file
+								data = File.ReadAllBytes(path),
+								pathID = file
 							};
 						}
 						catch {
@@ -197,7 +203,7 @@ namespace NTFSDuplicateLinker {
 				var work = new DuplicateFile(filePaths[i]);
 				for (var n = i + 1; n < filePaths.Count; n++)
 					if (work.filename == filePaths[n].filename)
-						work.instances.Add(filePaths[n].fullpath);
+						work.instances.Add(filePaths[n].fullpathID);
 				if (work.instances.Count > 1)
 					trans.Item1.Add(work);
 			}
@@ -224,7 +230,14 @@ namespace NTFSDuplicateLinker {
 		List<DuplicateFile> FinalDuplicates(List<DuplicateFile> duplicates) {
 			var ret = new List<DuplicateFile>();
 			foreach (var dup in duplicates) {
-				var options = new List<DuplicateFile>() { new DuplicateFile(new NormalFile(dup.instances[0])) };
+				var options = new List<DuplicateFile>() {
+					new DuplicateFile(
+						new NormalFile(
+							pathStorage[dup.instances[0]],
+							dup.instances[0]
+						)
+					)
+				};
 				hashedFiles.TryGetValue(options[0].instances[0], out var tmp);
 				var hashes = new List<byte[]> { tmp };
 				for (int n = 1; n < dup.instances.Count; n++) {
@@ -238,7 +251,14 @@ namespace NTFSDuplicateLinker {
 						}
 					}
 					if (!found) {
-						options.Add(new DuplicateFile(new NormalFile(dup.instances[n])));
+						options.Add(
+							new DuplicateFile(
+								new NormalFile(
+									pathStorage[dup.instances[n]], 
+									dup.instances[n]
+								)
+							)
+						);
 						hashes.Add(myhash);
 					}
 				}
@@ -267,25 +287,26 @@ namespace NTFSDuplicateLinker {
 			file.instances.Sort();
 			var newExtension = ".DVSLINKER.BAK";
 			string prefix = "\\\\?\\";// @"\?";
-			var orig = prefix + file.instances[0];
+			var orig = prefix + pathStorage[file.instances[0]];
 			uint links = Util.GetLinks(file);
 			for (int n = 1; n < file.instances.Count; n++, links++) {
+				var curr = pathStorage[file.instances[n]];
 				if (links >= 1023) {
 					orig = prefix + file.instances[n];
-					links = Util.GetLinks(file.instances[n]) - 1;//for loops adds 1 back on
+					links = Util.GetLinks(curr) - 1;//for loops adds 1 back on
 				}
 				else {
 					var backup = file.instances[n] + newExtension;
 					try {
 						if (File.Exists(backup))
 							File.Delete(backup);
-						File.Copy(file.instances[n], backup);//backup
-						File.Delete(file.instances[n]);
+						File.Copy(curr, backup);//backup
+						File.Delete(curr);
 					}
 					catch {
-						if (!File.Exists(file.instances[n])) {
+						if (!File.Exists(curr)) {
 							if (File.Exists(backup)) {
-								File.Copy(backup, file.instances[n]);
+								File.Copy(backup, curr);
 								File.Delete(backup);
 							}
 						}
@@ -296,7 +317,7 @@ namespace NTFSDuplicateLinker {
 					if (!Syscall.CreateHardLink(path, orig, IntPtr.Zero)) {
 						uint error = Syscall.GetLastError();//Marshal.GetLastWin32Error();
 						Debug.WriteLine("ERROR: " + error);
-						File.Copy(backup, file.instances[n]);//restore backup
+						File.Copy(backup, curr);//restore backup
 						File.Delete(backup);
 					}
 					else {
@@ -377,10 +398,11 @@ namespace NTFSDuplicateLinker {
 				return;
 			}
 			DisplayError(false);
+			pathStorage = new List<string>();
 			var files = new Queue<WorkFile>();
 			var filePaths = new List<NormalFile>();
 			var duplicates = new List<DuplicateFile>();
-			hashedFiles = new Dictionary<string, byte[]>();
+			hashedFiles = new Dictionary<int, byte[]>();
 
 			running = 1;
 			PBManager.Init(pbStatus, 7, 1);
@@ -388,9 +410,11 @@ namespace NTFSDuplicateLinker {
 			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(path, filePaths));
 			while (running > 0) {
 				await Task.Delay(100);
+				lbSBFound.Content = position;
 			}
-			PBManager.MoveToNextAction(filePaths.Count);
 
+			PBManager.MoveToNextAction(filePaths.Count);
+			position = 0;
 			running = 1;
 			Debug.WriteLine("Identifying duplicates...");
 			ThreadPool.QueueUserWorkItem(
@@ -399,7 +423,10 @@ namespace NTFSDuplicateLinker {
 			while (running > 0) {
 				await Task.Delay(100);
 				PBManager.UpdateCurrentPosition(position);
+				lbSBAnalyzed.Content = position;
 			}
+			filePaths.Clear();
+
 			Debug.WriteLine("Found:" + duplicates.Count + " duplicates in " + filePaths.Count + " Files");
 			PBManager.MoveToNextAction(duplicates.Count);
 
@@ -425,6 +452,7 @@ namespace NTFSDuplicateLinker {
 				);
 			while (running > 0) {
 				PBManager.UpdateCurrentPosition(position);
+				lbSBHashed.Content = position;
 				await Task.Delay(100);
 			}
 			Debug.WriteLine("Computed:" + hashedFiles.Count + " Hashes!");
@@ -440,12 +468,14 @@ namespace NTFSDuplicateLinker {
 			PBManager.MoveToNextAction(1);
 
 			finalDuplicates = FinalDuplicates(duplicates);
+			duplicates.Clear();
 			Debug.WriteLine("Identified final Duplicates. found: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(1);
 
 			finalDuplicates = CleanupDuplicates(finalDuplicates);
 			Debug.WriteLine("Removed non-duplicates. final count: " + finalDuplicates.Count);
 			PBManager.MoveToNextAction(finalDuplicates.Count);
+			lbSBDuplicates.Content = finalDuplicates.Count;
 			await DisplayDuplicates(finalDuplicates);
 			btLink.IsEnabled = true;
 		}
@@ -463,8 +493,14 @@ namespace NTFSDuplicateLinker {
 			btLink.IsEnabled = false;
 			tbPath.IsReadOnly = true;
 			btAnalyze.IsEnabled = false;
-			duplicates_view.Clear();
+			var TBA = new TextBlockAnimator(tbSBAnimation) {
+				showLeft = true,
+				showRight = false
+			};
+			TBA.Start("");
+			duplicates_view.Clear();			
 			await Analyzer(tbPath.Text);
+			TBA.Stop();
 			btAnalyze.IsEnabled = true;
 			tbPath.IsReadOnly = false;
 		}
