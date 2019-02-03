@@ -20,20 +20,11 @@ namespace NTFSDuplicateLinker {
 		/// all known instances of this file
 		/// </summary>
 		public List<int> instances;
-		public class ReferenceViewer{
-			readonly int myref;
-			public ReferenceViewer(int nref) {
-				myref = nref;
-			}
-			public new string ToString() {
-				return MainWindow.pathStorage[myref];
-			}
-		}
-		public ReferenceViewer[] Instances {
+		public string[] Instances {
 			get {
-				var ret = new ReferenceViewer[instances.Count];
+				var ret = new string[instances.Count];
 				for (int n = 0, ln = instances.Count; n < ln; n++)
-					ret[n] =new ReferenceViewer(instances[n]);
+					ret[n] = MainWindow.pathStorage[instances[n]];
 				return ret;
 			}
 		}
