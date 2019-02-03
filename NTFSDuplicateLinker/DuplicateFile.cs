@@ -10,25 +10,33 @@ namespace NTFSDuplicateLinker {
 		/// Just the name and extension
 		/// </summary>
 		public readonly string filename;
-        public string Filename
-        {
-            get => filename;
-        }
+		public string Filename {
+			get => filename;
+		}
 
-        public bool Deduplicate {  get;  set; }
+		public bool Deduplicate { get; set; }
 
 		/// <summary>
 		/// all known instances of this file
 		/// </summary>
 		public List<int> instances;
-        public string[] Instances {
-            get {
-				var ret = new string [instances.Count];
-				for(int n=0,ln= instances.Count; n<ln;n++)
-					ret[n] = MainWindow.pathStorage[instances[n]];
+		public class ReferenceViewer{
+			readonly int myref;
+			public ReferenceViewer(int nref) {
+				myref = nref;
+			}
+			public new string ToString() {
+				return MainWindow.pathStorage[myref];
+			}
+		}
+		public ReferenceViewer[] Instances {
+			get {
+				var ret = new ReferenceViewer[instances.Count];
+				for (int n = 0, ln = instances.Count; n < ln; n++)
+					ret[n] =new ReferenceViewer(instances[n]);
 				return ret;
-            }
-        }
+			}
+		}
 		public byte[] finalhash;
 		public string DisplayText {
 			get => filename + "\t(" + (finalhash == null ? "NULL" : System.Convert.ToBase64String(finalhash)) + ")";
