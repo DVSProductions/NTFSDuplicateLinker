@@ -28,6 +28,7 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		long usedMemory = 0;
 		public static List<string> pathStorage;
+		public static List<long> sizeStorage;
 		/// <summary>
 		/// FilepathID and hash
 		/// </summary>
@@ -141,8 +142,10 @@ namespace NTFSDuplicateLinker {
 		static void HashSync(string file,int id, Dictionary<int, byte[]> lst) {
 			using (var hasher = MD5.Create()) {
 				using (var fs = File.OpenRead(file)) {
-					if (fs.Length == 0)
+					if (fs.Length == 0) {
+						fs.Close();
 						return;
+					}
 					var hash = hasher.ComputeHash(fs);
 					lock (lst) {
 						if (!lst.ContainsKey(id))
@@ -164,6 +167,7 @@ namespace NTFSDuplicateLinker {
 					var path = pathStorage[file];
 					//check for huge size
 					var fi = new FileInfo(path);
+					sizeStorage.Add(fi.Length);
 					if (fi.Length > Config.MAXIMUMASYNCFILESIZE) {
 						HashSync(path,file, access.results);
 					}
@@ -332,15 +336,18 @@ namespace NTFSDuplicateLinker {
 		/// <param name="duplicates">List of all duplicates to link</param>
 		/// <returns></returns>
 		async Task LinkAllDuplicates(List<DuplicateFile> duplicates) {
-			int last = 0;
+			var st = Stopwatch.StartNew();
 			for (long n = 0; n < duplicates.Count; n++) {
+				if (duplicates[(int)n].Link == false)
+					continue;
 				LinkDuplicates(duplicates[(int)n]);
 				pbStatus.Value = n;
-				if ((n * 100) / duplicates.Count > last * 5) {
-					last++;
+				if (st.ElapsedMilliseconds> 2500) {					
 					await Task.Delay(100);
+					st.Restart();
 				}
 			}
+			await Task.Delay(100);
 		}
 		/*
 		void LinkAllDuplicates(List<DuplicateFile> duplicates) {
@@ -399,6 +406,7 @@ namespace NTFSDuplicateLinker {
 			}
 			DisplayError(false);
 			pathStorage = new List<string>();
+			sizeStorage = new List<long>();
 			var files = new Queue<WorkFile>();
 			var filePaths = new List<NormalFile>();
 			var duplicates = new List<DuplicateFile>();
