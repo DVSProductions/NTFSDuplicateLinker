@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NTFSDuplicateLinker"
         mc:Ignorable="d"
-        Title="DVSProductions FileLinker" Height="450" Width="651.11">
+        Title="DVSProductions FileLinker" Height="450" Width="886.358">
 	<DockPanel>
 		<Menu DockPanel.Dock="Top">
 			<MenuItem Header="File">
@@ -25,15 +25,42 @@
 				<RowDefinition/>
 				<RowDefinition Height="70"/>
 			</Grid.RowDefinitions>
-			<Grid VerticalAlignment="Top">
+			<Grid VerticalAlignment="Top" Margin="10,0">
 				<Label>Path:</Label>
-				<TextBox x:Name="tbPath" Margin="41,0,90,0" Height="27" BorderBrush="Gray"/>
-				<Button x:Name="btAnalyze" Content="Analyze" Click="BtAnalyze_Click" Height="27" HorizontalAlignment="Right" Width="85"/>
+				<TextBox TabIndex="0" x:Name="tbPath" Margin="41,0,90,0" Height="27" BorderBrush="Gray" BorderThickness="1.5" TextChanged="TbPath_TextChanged" PreviewKeyDown="TbPath_PreviewKeyDown"/>
+				<Button x:Name="btAnalyze" Content="Analyze" Click="BtAnalyze_Click" Height="27" HorizontalAlignment="Right" Width="85" IsDefault="True"/>
 			</Grid>
-			<DataGrid x:Name="duplicatesListView" Grid.Row="1">
+
+			<DataGrid x:Name="duplicatesDataGrid" Grid.Row="1" AutoGenerateColumns="False">
+				<DataGrid.Columns>
+					<DataGridCheckBoxColumn Header="Links" Binding="{Binding Link}"/>
+					<DataGridTextColumn Header="Name" Binding="{Binding Filename}" IsReadOnly="True"/>
+					<DataGridTextColumn Header="Copies" Binding="{Binding DetectedCopies}" IsReadOnly="True">
+						<DataGridTextColumn.ElementStyle>
+							<Style TargetType="TextBlock">
+								<Setter Property="HorizontalAlignment" Value="Right"/>
+							</Style>
+						</DataGridTextColumn.ElementStyle>						
+					</DataGridTextColumn>
+					<DataGridTextColumn Header="Hash" Binding="{Binding Hash}" IsReadOnly="True"/>
+					<DataGridTextColumn Header="Size" Binding="{Binding Size}" SortMemberPath="Size.Mysize"  IsReadOnly="True">
+						<DataGridTextColumn.ElementStyle>
+							<Style TargetType="TextBlock">
+								<Setter Property="HorizontalAlignment" Value="Right"/>
+							</Style>
+						</DataGridTextColumn.ElementStyle>
+					</DataGridTextColumn>
+					<DataGridTextColumn Header="Links" Binding="{Binding Links}" IsReadOnly="True">
+						<DataGridTextColumn.ElementStyle>
+							<Style TargetType="TextBlock">
+								<Setter Property="HorizontalAlignment" Value="Right"/>
+							</Style>
+						</DataGridTextColumn.ElementStyle>
+					</DataGridTextColumn>
+				</DataGrid.Columns>
 			</DataGrid>
-			<StackPanel Grid.Row="2" VerticalAlignment="Bottom">
-				<Grid>
+			<Grid Grid.Row="2">
+				<Grid Margin="10,0" VerticalAlignment="Top">
 					<ProgressBar x:Name="pbStatus" Margin="0,0,90,0" Height="41"></ProgressBar>
 					<Button x:Name="btLink" IsEnabled="False" Click="BtLink_Click" Height="41" HorizontalAlignment="Right" Width="90">Link!</Button>
 				</Grid>
@@ -66,7 +93,7 @@
 						<TextBlock x:Name="tbSBAnimation" Text="\"/>
 					</StatusBarItem>
 				</StatusBar>
-			</StackPanel>
+			</Grid>
 		</Grid>
 	</DockPanel>
 </Window>

@@ -51,6 +51,7 @@
 				currentTarget = newTarget;
 				currentState = 0;
 				currentAction++;
+				Render();
 			}
 			/// <summary>
 			/// Sets the amount of completed steps in this Action

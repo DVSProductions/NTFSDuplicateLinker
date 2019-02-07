@@ -17,7 +17,7 @@ namespace NTFSDuplicateLinker {
 		public static bool AnalyzeDirectoryForJunctions(string pathToDirectory) =>
 				AnalyzeDIForJunctions(new DirectoryInfo(pathToDirectory));
 		/// <summary>
-		/// Finds out wether a path is part of a Junction
+		/// Finds out whether a path is part of a Junction
 		/// </summary>
 		/// <param name="path"></param>
 		/// <returns>True if Path is contained in a Junction</returns>
@@ -81,5 +81,12 @@ namespace NTFSDuplicateLinker {
 					return d.DriveFormat == "NTFS";
 			return false;
 		}
+		/// <summary>
+		/// Ensures that a path is safe to use and on NTFS
+		/// </summary>
+		/// <param name="path"></param>
+		/// <returns></returns>
+		public static bool IsPathOK(string path) =>
+			!string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && IsOnNTFS(path);
 	}
 }

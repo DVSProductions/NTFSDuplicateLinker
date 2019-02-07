@@ -27,7 +27,13 @@ namespace NTFSDuplicateLinker {
 		/// Program memory usage in bits
 		/// </summary>
 		long usedMemory = 0;
+		/// <summary>
+		/// stores all identified paths
+		/// </summary>
 		public static List<string> pathStorage;
+		/// <summary>
+		/// stores filesizes
+		/// </summary>
 		public static List<long> sizeStorage;
 		/// <summary>
 		/// FilepathID and hash
@@ -44,8 +50,8 @@ namespace NTFSDuplicateLinker {
 
 
 		/// <summary>
-		/// Independend Thread
-		/// Searches for files in a given folderstructure
+		/// Independent Thread
+		/// Searches for files in a given folder structure
 		/// </summary>
 		/// <param name="obj">Tuple<string, List<NormalFile>> Object containing </param>
 		void Discover(object obj) {
@@ -68,7 +74,7 @@ namespace NTFSDuplicateLinker {
 
 					foreach (var fp in Directory.EnumerateFiles(work)) {
 						pathStorage.Add(fp);
-						ret.Add(new NormalFile(fp,idx++));
+						ret.Add(new NormalFile(fp, idx++));
 						position++;
 					}
 				}
@@ -139,7 +145,7 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <param name="file">Path of the file to hash</param>
 		/// <param name="lst"><see cref="Dictionary{string,byte[]}"/> reference to all hashes</param>
-		static void HashSync(string file,int id, Dictionary<int, byte[]> lst) {
+		static void HashSync(string file, int id, Dictionary<int, byte[]> lst) {
 			using (var hasher = MD5.Create()) {
 				using (var fs = File.OpenRead(file)) {
 					if (fs.Length == 0) {
@@ -169,7 +175,7 @@ namespace NTFSDuplicateLinker {
 					var fi = new FileInfo(path);
 					sizeStorage.Add(fi.Length);
 					if (fi.Length > Config.MAXIMUMASYNCFILESIZE) {
-						HashSync(path,file, access.results);
+						HashSync(path, file, access.results);
 					}
 					else {
 						var wf = new WorkFile();
@@ -258,7 +264,7 @@ namespace NTFSDuplicateLinker {
 						options.Add(
 							new DuplicateFile(
 								new NormalFile(
-									pathStorage[dup.instances[n]], 
+									pathStorage[dup.instances[n]],
 									dup.instances[n]
 								)
 							)
@@ -290,17 +296,17 @@ namespace NTFSDuplicateLinker {
 		static void LinkDuplicates(DuplicateFile file) {
 			file.instances.Sort();
 			var newExtension = ".DVSLINKER.BAK";
-			string prefix = "\\\\?\\";// @"\?";
+			string prefix = @"\\?\";//allow unicode
 			var orig = prefix + pathStorage[file.instances[0]];
 			uint links = Util.GetLinks(file);
 			for (int n = 1; n < file.instances.Count; n++, links++) {
 				var curr = pathStorage[file.instances[n]];
 				if (links >= 1023) {
-					orig = prefix + file.instances[n];
+					orig = prefix + curr;
 					links = Util.GetLinks(curr) - 1;//for loops adds 1 back on
 				}
 				else {
-					var backup = file.instances[n] + newExtension;
+					var backup = curr + newExtension;
 					try {
 						if (File.Exists(backup))
 							File.Delete(backup);
@@ -309,16 +315,14 @@ namespace NTFSDuplicateLinker {
 					}
 					catch {
 						if (!File.Exists(curr)) {
-							if (File.Exists(backup)) {
-								File.Copy(backup, curr);
-								File.Delete(backup);
-							}
+							if (File.Exists(backup)) 
+								File.Copy(backup, curr);								
 						}
+						if (File.Exists(backup))
+							File.Delete(backup);
 						continue;
 					}
-
-					var path = prefix + file.instances[n];
-					if (!Syscall.CreateHardLink(path, orig, IntPtr.Zero)) {
+					if (!Syscall.CreateHardLink(prefix + curr, orig, IntPtr.Zero)) {
 						uint error = Syscall.GetLastError();//Marshal.GetLastWin32Error();
 						Debug.WriteLine("ERROR: " + error);
 						File.Copy(backup, curr);//restore backup
@@ -342,7 +346,7 @@ namespace NTFSDuplicateLinker {
 					continue;
 				LinkDuplicates(duplicates[(int)n]);
 				pbStatus.Value = n;
-				if (st.ElapsedMilliseconds> 2500) {					
+				if (st.ElapsedMilliseconds > 2500) {
 					await Task.Delay(100);
 					st.Restart();
 				}
@@ -363,14 +367,13 @@ namespace NTFSDuplicateLinker {
 		}
 		*/
 		/// <summary>
-		/// Show all Duplicates in <see cref="MainWindow.duplicatesListView"/>
+		/// Show all Duplicates in <see cref="MainWindow.duplicatesDataGrid"/>
 		/// </summary>
 		/// <param name="ldf">All duplicates</param>
 		/// <returns></returns>
 		async Task DisplayDuplicates(List<DuplicateFile> ldf) {
 			bool switcher = true;
 			position = 0;
-			long next = 0;
 			var s = Stopwatch.StartNew();
 			foreach (var df in ldf) {
 				position++;
@@ -378,68 +381,67 @@ namespace NTFSDuplicateLinker {
 				hashedFiles.TryGetValue(df.instances[0], out var myhash);
 				df.finalhash = myhash;
 				duplicates_view.Add(df);
-				if (s.ElapsedMilliseconds / 1000 >= next) {
-					next = (s.ElapsedMilliseconds / 1000) + 1;
+				if (s.ElapsedMilliseconds / 1000 >= 1) {
+					s.Restart();
 					PBManager.UpdateCurrentPosition(position);
-					await Task.Delay(33);
+					await Task.Delay(100);
 				}
 			}
 			PBManager.UpdateCurrentPosition(position);
 		}
-		void DisplayError(bool error) {
+		void PaintTB(bool error) {
 			tbPath.BorderBrush = error ? new SolidColorBrush(Colors.Red) : new SolidColorBrush(Colors.Gray);
-			tbPath.BorderThickness = error ? new Thickness(2) : new Thickness(1);
 		}
+
 		/// <summary>
 		/// Launches all hashing and analyzing logic
 		/// </summary>
 		/// <param name="path">Path to analyze. Does not have to be null checked</param>
 		/// <returns></returns>
 		async Task Analyzer(string path) {
-			if (
-				string.IsNullOrWhiteSpace(path) ||
-				!Directory.Exists(path) ||
-				!Util.IsOnNTFS(path)
-				) {
-				DisplayError(true);
-				return;
+			{
+				var isOK = Util.IsPathOK(path);
+				PaintTB(!isOK);
+				if (!isOK)
+					return;
 			}
-			DisplayError(false);
 			pathStorage = new List<string>();
 			sizeStorage = new List<long>();
 			var files = new Queue<WorkFile>();
 			var filePaths = new List<NormalFile>();
 			var duplicates = new List<DuplicateFile>();
 			hashedFiles = new Dictionary<int, byte[]>();
-
-			running = 1;
-			PBManager.Init(pbStatus, 7, 1);
-			Debug.WriteLine("Scanning...");
-			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(path, filePaths));
-			while (running > 0) {
-				await Task.Delay(100);
-				lbSBFound.Content = position;
+			void reset(long newTarget) {
+				position = 0;
+				running = 1;
+				if (newTarget != -1)
+					PBManager.MoveToNextAction(newTarget);
+			}
+			async Task whileRunning(Action a) {
+				while (running > 0) {
+					await Task.Delay(100);
+					PBManager.UpdateCurrentPosition(position);
+					a?.Invoke();
+				}
 			}
 
-			PBManager.MoveToNextAction(filePaths.Count);
-			position = 0;
-			running = 1;
+			PBManager.Init(pbStatus, 7, 1);
+			reset(-1);
+			Debug.WriteLine("Scanning...");
+			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(path, filePaths));
+			await whileRunning(() => lbSBFound.Content = position);
+
+			reset(filePaths.Count);
 			Debug.WriteLine("Identifying duplicates...");
 			ThreadPool.QueueUserWorkItem(
 				FindDuplicates,
 				new Tuple<List<DuplicateFile>, List<NormalFile>>(duplicates, filePaths));
-			while (running > 0) {
-				await Task.Delay(100);
-				PBManager.UpdateCurrentPosition(position);
-				lbSBAnalyzed.Content = position;
-			}
-			filePaths.Clear();
-
+			await whileRunning(() => lbSBAnalyzed.Content = position);
 			Debug.WriteLine("Found:" + duplicates.Count + " duplicates in " + filePaths.Count + " Files");
-			PBManager.MoveToNextAction(duplicates.Count);
 
+			filePaths.Clear();
 			stillLoading = true;
-			running = 1;
+			reset(duplicates.Count);
 			ThreadPool.QueueUserWorkItem(MemoryMonitor);
 			ThreadPool.QueueUserWorkItem(
 				Reader,
@@ -458,41 +460,39 @@ namespace NTFSDuplicateLinker {
 						results = hashedFiles
 					}
 				);
-			while (running > 0) {
-				PBManager.UpdateCurrentPosition(position);
-				lbSBHashed.Content = position;
-				await Task.Delay(100);
-			}
+			await whileRunning(() => lbSBHashed.Content = position);
 			Debug.WriteLine("Computed:" + hashedFiles.Count + " Hashes!");
-			running = 1;
-			PBManager.MoveToNextAction(duplicates.Count);
 
+			reset(duplicates.Count);
 			ThreadPool.QueueUserWorkItem(Sortall, duplicates);
-			while (running > 0) {
-				PBManager.UpdateCurrentPosition(position);
-				await Task.Delay(100);
-			}
+			await whileRunning(null);
 			Debug.WriteLine("Sorted!");
-			PBManager.MoveToNextAction(1);
 
+			PBManager.MoveToNextAction(1);
 			finalDuplicates = FinalDuplicates(duplicates);
 			duplicates.Clear();
 			Debug.WriteLine("Identified final Duplicates. found: " + finalDuplicates.Count);
-			PBManager.MoveToNextAction(1);
 
+			PBManager.MoveToNextAction(1);
 			finalDuplicates = CleanupDuplicates(finalDuplicates);
 			Debug.WriteLine("Removed non-duplicates. final count: " + finalDuplicates.Count);
+
 			PBManager.MoveToNextAction(finalDuplicates.Count);
 			lbSBDuplicates.Content = finalDuplicates.Count;
 			await DisplayDuplicates(finalDuplicates);
+			PBManager.MoveToNextAction(1);
 			btLink.IsEnabled = true;
+			btAnalyze.IsDefault = false;
+			btLink.IsDefault = true;
 		}
 
 		//---------- LOGIC FOR UI ----------
 		public MainWindow() {
 			InitializeComponent();
-			duplicatesListView.ItemsSource = duplicates_view;
+			duplicatesDataGrid.ItemsSource = duplicates_view;
+			tbPath.Focus();
 		}
+
 		/// <summary>
 		/// Event für <see cref="btAnalyze"/>
 		/// </summary>
@@ -506,7 +506,7 @@ namespace NTFSDuplicateLinker {
 				showRight = false
 			};
 			TBA.Start("");
-			duplicates_view.Clear();			
+			duplicates_view.Clear();
 			await Analyzer(tbPath.Text);
 			TBA.Stop();
 			btAnalyze.IsEnabled = true;
@@ -520,11 +520,30 @@ namespace NTFSDuplicateLinker {
 		private async void BtLink_Click(object sender, RoutedEventArgs e) {
 			btLink.IsEnabled = false;
 			btAnalyze.IsEnabled = false;
+			var TBA = new TextBlockAnimator(tbSBAnimation) {
+				showLeft = true,
+				showRight = false
+			};
+			TBA.Start("");
 			pbStatus.Value = 0;
 			pbStatus.Maximum = finalDuplicates.Count - 1;
 			await LinkAllDuplicates(finalDuplicates);
+			TBA.Stop();
 			duplicates_view.Clear();
 			btAnalyze.IsEnabled = true;
+			btLink.IsDefault = false;
+			btAnalyze.IsDefault = true;
+		}
+
+		private void TbPath_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) {
+			PaintTB(!Util.IsPathOK(((System.Windows.Controls.TextBox)sender).Text));
+		}
+
+		private void TbPath_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e) {
+			if (e.Key == System.Windows.Input.Key.Enter) {
+				btAnalyze.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+			}
 		}
 	}
 }
+

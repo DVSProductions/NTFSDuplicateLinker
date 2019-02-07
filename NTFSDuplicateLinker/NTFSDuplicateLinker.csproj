@@ -62,6 +62,7 @@
     </ApplicationDefinition>
     <Compile Include="Config.cs" />
     <Compile Include="DuplicateFile.cs" />
+    <Compile Include="Filesize.cs" />
     <Compile Include="HandoverObject.cs" />
     <Compile Include="NormalFile.cs" />
     <Compile Include="Syscall.cs" />
