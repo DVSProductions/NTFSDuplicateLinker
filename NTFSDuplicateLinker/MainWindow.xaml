@@ -33,7 +33,7 @@
 
 			<DataGrid x:Name="duplicatesDataGrid" Grid.Row="1" AutoGenerateColumns="False">
 				<DataGrid.Columns>
-					<DataGridCheckBoxColumn Header="Links" Binding="{Binding Link}"/>
+					<DataGridCheckBoxColumn Header="Link" Binding="{Binding Link}"/>
 					<DataGridTextColumn Header="Name" Binding="{Binding Filename}" IsReadOnly="True"/>
 					<DataGridTextColumn Header="Copies" Binding="{Binding DetectedCopies}" IsReadOnly="True">
 						<DataGridTextColumn.ElementStyle>
