@@ -1,9 +1,11 @@
-﻿namespace NTFSDuplicateLinker {
+﻿using System.Diagnostics;
+
+namespace NTFSDuplicateLinker {
 	public partial class MainWindow {
 		/// <summary>
 		/// Does calculations for the Progressbar
 		/// </summary>
-		static class PBManager {
+		public static class PBManager {
 			/// <summary>
 			/// current work object
 			/// </summary>
@@ -72,8 +74,8 @@
 			public static void Render() {
 				if (currentTarget != 0) {
 					var currentValue = ((currentState * 1000) / currentTarget) / 1000.0d;
-					currentValue *= (double)currentAction / (double)totalActions;
-					currentValue += ((currentAction * 100) / totalActions) / 100.0d;
+					//currentValue *= (double)currentAction / (double)totalActions;
+					//currentValue += ((currentAction * 100) / totalActions) / 100.0d;
 					bar.Value = currentValue;
 					//Debug.WriteLine(currentState + " / " + currentTarget + " = " + currentValue);
 				}

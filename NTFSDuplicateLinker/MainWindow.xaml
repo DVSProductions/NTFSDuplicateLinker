@@ -5,95 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NTFSDuplicateLinker"
         mc:Ignorable="d"
-        Title="DVSProductions FileLinker" Height="450" Width="886.358">
-	<DockPanel>
-		<Menu DockPanel.Dock="Top">
-			<MenuItem Header="File">
-
-			</MenuItem>
-			<MenuItem Header="Selection">
-			
-			</MenuItem>
-			<MenuItem Header="Filter">
-				<MenuItem Header="Neu"/>
-			</MenuItem>
-
-		</Menu>
-		<Grid>
-			<Grid.RowDefinitions>
-				<RowDefinition Height="30"/>
-				<RowDefinition/>
-				<RowDefinition Height="70"/>
-			</Grid.RowDefinitions>
-			<Grid VerticalAlignment="Top" Margin="10,0">
-				<Label>Path:</Label>
-				<TextBox TabIndex="0" x:Name="tbPath" Margin="41,0,90,0" Height="27" BorderBrush="Gray" BorderThickness="1.5" TextChanged="TbPath_TextChanged" PreviewKeyDown="TbPath_PreviewKeyDown"/>
-				<Button x:Name="btAnalyze" Content="Analyze" Click="BtAnalyze_Click" Height="27" HorizontalAlignment="Right" Width="85" IsDefault="True"/>
-			</Grid>
-
-			<DataGrid x:Name="duplicatesDataGrid" Grid.Row="1" AutoGenerateColumns="False">
-				<DataGrid.Columns>
-					<DataGridCheckBoxColumn Header="Link" Binding="{Binding Link}"/>
-					<DataGridTextColumn Header="Name" Binding="{Binding Filename}" IsReadOnly="True"/>
-					<DataGridTextColumn Header="Copies" Binding="{Binding DetectedCopies}" IsReadOnly="True">
-						<DataGridTextColumn.ElementStyle>
-							<Style TargetType="TextBlock">
-								<Setter Property="HorizontalAlignment" Value="Right"/>
-							</Style>
-						</DataGridTextColumn.ElementStyle>						
-					</DataGridTextColumn>
-					<DataGridTextColumn Header="Hash" Binding="{Binding Hash}" IsReadOnly="True"/>
-					<DataGridTextColumn Header="Size" Binding="{Binding Size}" SortMemberPath="Size.Mysize"  IsReadOnly="True">
-						<DataGridTextColumn.ElementStyle>
-							<Style TargetType="TextBlock">
-								<Setter Property="HorizontalAlignment" Value="Right"/>
-							</Style>
-						</DataGridTextColumn.ElementStyle>
-					</DataGridTextColumn>
-					<DataGridTextColumn Header="Links" Binding="{Binding Links}" IsReadOnly="True">
-						<DataGridTextColumn.ElementStyle>
-							<Style TargetType="TextBlock">
-								<Setter Property="HorizontalAlignment" Value="Right"/>
-							</Style>
-						</DataGridTextColumn.ElementStyle>
-					</DataGridTextColumn>
-				</DataGrid.Columns>
-			</DataGrid>
-			<Grid Grid.Row="2">
-				<Grid Margin="10,0" VerticalAlignment="Top">
-					<ProgressBar x:Name="pbStatus" Margin="0,0,90,0" Height="41"></ProgressBar>
-					<Button x:Name="btLink" IsEnabled="False" Click="BtLink_Click" Height="41" HorizontalAlignment="Right" Width="90">Link!</Button>
-				</Grid>
-				<StatusBar VerticalAlignment="Bottom">
-					<StatusBarItem>
-						<StackPanel Orientation="Horizontal">
-							<Label Padding="0" Content="Found: "/>
-							<Label x:Name="lbSBFound" Padding="0" Content="0"/>
-						</StackPanel>
-					</StatusBarItem>
-					<StatusBarItem>
-						<StackPanel Orientation="Horizontal">
-							<Label Padding="0" Content="Analyzed: "/>
-							<Label x:Name="lbSBAnalyzed" Padding="0" Content="0"/>
-						</StackPanel>
-					</StatusBarItem>
-					<StatusBarItem>
-						<StackPanel Orientation="Horizontal">
-							<Label Padding="0" Content="Hashed: "/>
-							<Label x:Name="lbSBHashed" Padding="0" Content="0"/>
-						</StackPanel>
-					</StatusBarItem>
-					<StatusBarItem>
-						<StackPanel Orientation="Horizontal">
-							<Label Padding="0" Content="Duplicated: "/>
-							<Label x:Name="lbSBDuplicates" Padding="0" Content="0"/>
-						</StackPanel>
-					</StatusBarItem>
-					<StatusBarItem HorizontalAlignment="Right" >
-						<TextBlock x:Name="tbSBAnimation" Text="\"/>
-					</StatusBarItem>
-				</StatusBar>
-			</Grid>
-		</Grid>
-	</DockPanel>
+        Title="DVSProductions FileLinker" Height="450" Width="651.11">
+	<Grid Background="{DynamicResource BGColor}">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="60"/>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="70"/>
+		</Grid.RowDefinitions>
+		<Label Foreground="LightGray" FontSize="30" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,5,0,5">NTFS Duplicate Linker</Label>
+		<Frame Grid.Row="1" x:Name="PageViewer" Margin="0" NavigationUIVisibility="Hidden"/>
+		<Button Grid.Row="2" x:Name="btNext" FontSize="20" Style="{DynamicResource BTStyle}" Margin="0,0,10,10" Click="BtNext_Click" VerticalAlignment="Bottom" HorizontalAlignment="Right" Padding="10,5">Next</Button>
+		<Button Grid.Row="2" x:Name="btBack" FontSize="20" Style="{DynamicResource BTStyle}" Margin="10,0,0,10" Click="BtBack_Click" VerticalAlignment="Bottom" Visibility="Hidden" HorizontalAlignment="Left" Padding="10,5">Back</Button>
+	</Grid>
 </Window>

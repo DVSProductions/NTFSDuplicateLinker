@@ -1,7 +1,7 @@
 ﻿using System.IO;
 
 namespace NTFSDuplicateLinker {
-	struct NormalFile {
+	public struct NormalFile {
 		/// <summary>
 		/// Path to the file
 		/// </summary>

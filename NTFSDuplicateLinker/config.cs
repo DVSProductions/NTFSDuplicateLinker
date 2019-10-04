@@ -15,14 +15,14 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		/// Higher memory -> higher loading speed
 		/// </summary>
-		public static readonly long MAXMEMORYUSAGE=2000000000L;
+		public static readonly long MAXMEMORYUSAGE= 6_000_000_000L;
 		/// <summary>
 		///		Memory usage must be under this value to stop <see cref="MainWindow.HashAsync(object)"/> from panicking
 		/// <para>
 		///		default: 400MB (400.000.000L)
 		/// </para>
 		/// </summary>
-		public static readonly long MINMEMORYUSAGE = 400000000L;
+		public static readonly long MINMEMORYUSAGE = 400_000_000L;
 		/// <summary>
 		/// If this value is exceeded <see cref="MainWindow.HashAsync(object)"/> will decrease Hashing delays
 		/// <para>
@@ -30,7 +30,7 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		/// Allows for a more responsive UI and fewer lock Instructions while loading and memory is below <see cref="OKMEMORYUSAGE"/>
 		/// </summary>
-		public static readonly long OKMEMORYUSAGE = 1000000000L;		
+		public static readonly long OKMEMORYUSAGE = 1_000_000_000L;		
 		/// <summary>
 		/// Polling frequency of <see cref="MainWindow.MemoryMonitor(object)"/>
 		/// <para>
@@ -63,7 +63,7 @@ namespace NTFSDuplicateLinker
 		///		default: 1GB (1.000.000.000L)
 		/// </para>
 		/// </summary>
-		public static readonly long MAXIMUMASYNCFILESIZE = 1000000000L;
+		public static readonly long MAXIMUMASYNCFILESIZE = 1_000_000_000L;
 		/// <summary>
 		/// Number of hashing threads
 		/// <para>

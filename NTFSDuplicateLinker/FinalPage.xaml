@@ -1,0 +1,19 @@
+﻿<Page x:Class="NTFSDuplicateLinker.FinalPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:NTFSDuplicateLinker"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="FinalPage">
+
+    <Grid>
+		<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+		<Label HorizontalAlignment="Center" FontSize="40" Foreground="White">Success!</Label>
+			<Label x:Name="lbcount" Foreground="White" FontSize="25" HorizontalAlignment="Center">1234567890123456789</Label>
+			<Label Foreground="LightGray" FontSize="20">Files have been removed and we freed up</Label>
+			<Label x:Name="lbstore" FontSize="40" HorizontalAlignment="Center" Foreground="#FFAB3A3A">1GB</Label>
+		</StackPanel>
+	</Grid>
+</Page>
