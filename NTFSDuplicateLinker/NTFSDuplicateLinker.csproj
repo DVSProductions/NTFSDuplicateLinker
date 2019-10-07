@@ -28,13 +28,14 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -71,6 +72,7 @@
     <Compile Include="FinalPage.xaml.cs">
       <DependentUpon>FinalPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Folder.cs" />
     <Compile Include="HandoverObject.cs" />
     <Compile Include="NormalFile.cs" />
     <Compile Include="PathPage.xaml.cs">
@@ -86,7 +88,6 @@
     <Compile Include="TextBlockAnimator.cs" />
     <Compile Include="ThreadWithResult.cs" />
     <Compile Include="Util.cs" />
-    <Compile Include="WorkFile.cs" />
     <Page Include="Filters.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

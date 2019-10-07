@@ -1,4 +1,5 @@
-﻿using System;
+﻿#define UseThreadPool
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -23,23 +24,12 @@ namespace NTFSDuplicateLinker {
 		/// <summary>
 		/// Used for Tracking progress across Tasks
 		/// </summary>
-		int position = 0;
+		long position = 0;
 		/// <summary>
 		/// Program memory usage in bits
 		/// </summary>
 		long usedMemory = 0;
-		/// <summary>
-		/// stores all identified paths
-		/// </summary>
-		public static List<string> pathStorage;
-		/// <summary>
-		/// stores filesizes
-		/// </summary>
-		public static List<long> sizeStorage;
-		/// <summary>
-		/// FilepathID and hash
-		/// </summary>
-		Dictionary<int, byte[]> hashedFiles;
+		Folder fullstructure;
 		/// <summary>
 		/// <see cref="List{}"/> containing every identified <see cref="DuplicateFile"/>
 		/// </summary>
@@ -63,19 +53,23 @@ namespace NTFSDuplicateLinker {
 				currPath = conv.Item1;
 				ret = conv.Item2;
 			}
-			var dirs = new Queue<string>();
-			dirs.Enqueue(currPath);
-			var idx = 0;
+			fullstructure = new Folder(currPath, null);
+			var dirs = new Queue<Folder>();
+			dirs.Enqueue(fullstructure);
 			while(dirs.Count > 0) {
 				var work = dirs.Dequeue();
 				try {
-					foreach(var d in Directory.EnumerateDirectories(work))
-						if(!Util.AnalyzePathForJunctions(d))
-							dirs.Enqueue(d);
+					foreach(var d in Directory.EnumerateDirectories(work.Path))
+						if(!Util.AnalyzePathForJunctions(d)) {
+							var f = new Folder(Path.GetFileName(d), work);//seems wrong but is correct
+																		  //work.Directories.Add(f);
+							dirs.Enqueue(f);
+						}
 
-					foreach(var fp in Directory.EnumerateFiles(work)) {
-						pathStorage.Add(fp);
-						ret.Add(new NormalFile(fp, idx++));
+					foreach(var fp in Directory.EnumerateFiles(work.Path)) {
+						var nf = new NormalFile(Path.GetFileName(fp), work);
+						ret.Add(nf);
+						//work.Files.Add(nf);
 						position++;
 					}
 				}
@@ -90,70 +84,89 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <param name="nul">noting</param>
 		void MemoryMonitor(object nul) {
-			while(running > 1) {
-				usedMemory = GC.GetTotalMemory(false);
-				Task.Delay(Config.MEMORYMONITORDELAY).Wait();
+			var p = Process.GetCurrentProcess();
+			while(stillLoading) {
+				p.Refresh();
+				usedMemory = p.WorkingSet64; //GC.GetTotalMemory(false);
+				Thread.Sleep(Config.MEMORYMONITORDELAY);
 			}
-			running--;
+			usedMemory = 0;
 		}
+		static int hashedFiles;
+#if UseThreadPool
+		void WorkerThreadHasher(object target) {
+			if(target is NormalFile work)
+				if(work.Hashstate == Hashstate.queued) {
+					work.Hashstate = Hashstate.hashing;
+					using(var hasher = MD5.Create()) {
+						work.hash = hasher.ComputeHash(work.data);
+						work.data = null;
+						hashedFiles++;
+					}
+					work.Hashstate = Hashstate.done;
+				}
+		}
+#else
 		/// <summary>
 		/// Looks for Files in the Queue&lt;<see cref="WorkFile"/>&gt; and starts hashing them
 		/// </summary>
 		/// <param name="obj"><see cref="HandoverObject"/> containing the required references</param>
-		void HashAsync(object obj) {
-			var access = (HandoverObject) obj;
+		int HashAsync(HandoverObject access) {
 			using(var hasher = MD5.Create()) {
 				var panic = false;
-				while(stillLoading || access.queque.Count > 0) {
-					if(access.queque.Count > 0) {
-						var work = new WorkFile() { pathID = -1 };
-						lock(access.queque) {
-							if(access.queque.Count > 0)
-								work = access.queque.Dequeue();
-						}
-						if(work.pathID != -1) {
-							var dat = hasher.ComputeHash(work.data);
-							lock(access.results)
-								if(!access.results.ContainsKey(work.pathID))
-									access.results.Add(work.pathID, dat);
+				while(stillLoading || access.queue.Count > 0) {
+					if(access.queue.Count > 0) {
+						NormalFile work = null;
+						lock(access.queue)
+							if(access.queue.Count == 0)
+								Thread.Sleep(10);
+							else
+								work = access.queue.Dequeue();
+						if(work != null && work.data != null) {
+							work.hash = hasher.ComputeHash(work.data);
+							work.data = null;
+							hashedFiles++;
 						}
 						if(!panic) {
 							if(usedMemory > Config.MAXMEMORYUSAGE)
 								panic = true;
-							else if(usedMemory < Config.OKMEMORYUSAGE && stillLoading)
-								Task.Delay(Config.HASHASYNCREGDELAY).Wait();
 							else if(stillLoading)
-								Task.Delay(Config.HASHASYNCNOTOKDELAY).Wait();
+								Thread.Sleep(usedMemory < Config.OKMEMORYUSAGE ? Config.HASHASYNCREGDELAY : Config.HASHASYNCNOTOKDELAY);
 						}
 						else if(usedMemory < Config.MINMEMORYUSAGE)
 							panic = false;
 					}
 					else {
 						GC.Collect();
-						Task.Delay(Config.HASHASYNCREGDELAY).Wait();
+						Thread.Sleep(Config.HASHASYNCREGDELAY);
 					}
 				}
 			}
 			running--;
+			return 0;
 		}
+#endif
 		/// <summary>
-		/// Hashes very large files on the fly
-		/// MUCH SLOWER than async hashing.
+		/// Hashes very large files on the fly.
+		/// MUCH SLOWER than async hashing!
 		/// </summary>
 		/// <param name="file">Path of the file to hash</param>
 		/// <param name="lst"><see cref="Dictionary{string,byte[]}"/> reference to all hashes</param>
-		static void HashSync(string file, int id, Dictionary<int, byte[]> lst) {
+		static bool HashSync(NormalFile file) {
+			if(file.Hashstate == Hashstate.hashing) return false;
+			file.Hashstate = Hashstate.hashing;
+			MessageBox.Show("Doing Sync");
 			using(var hasher = MD5.Create()) {
-				using(var fs = File.OpenRead(file)) {
+				using(var fs = File.OpenRead(file.Path)) {
 					if(fs.Length == 0) {
 						fs.Close();
-						return;
+						file.Hashstate = Hashstate.nonexsistant;
+						return false;
 					}
-					var hash = hasher.ComputeHash(fs);
-					lock(lst) {
-						if(!lst.ContainsKey(id))
-							lst.Add(id, hash);
-					}
+					file.hash = hasher.ComputeHash(fs);
+					hashedFiles++;
+					file.Hashstate = Hashstate.done;
+					return true;
 				}
 			}
 		}
@@ -161,39 +174,58 @@ namespace NTFSDuplicateLinker {
 		/// Loads all identified duplicates into Memory for hashing by <see cref="HashAsync(object)"/>
 		/// </summary>
 		/// <param name="obj"><see cref="HandoverObject"/> containing the required references</param>
-		void Reader(object obj) {
-			position = 0;
-			var access = (HandoverObject) obj;
+		int Reader(HandoverObject access) {
 			foreach(var dup in access.targets) {
 				position++;
 				foreach(var file in dup.instances) {
-					var path = pathStorage[file];
+					if(file.Hashstate != Hashstate.nonexsistant) continue;
+					file.Hashstate = Hashstate.queued;
+					var path = file.Path;
 					//check for huge size
-					var fi = new FileInfo(path);
-					sizeStorage.Add(fi.Length);
-					if(fi.Length > Config.MAXIMUMASYNCFILESIZE) {
-						HashSync(path, file, access.results);
-					}
+					if(file.Size > Config.MAXIMUMASYNCFILESIZE)
+						HashSync(file);
 					else {
-						WorkFile wf;
 						try {
-							wf = new WorkFile() {
-								data = File.ReadAllBytes(path),
-								pathID = file
-							};
+							file.data = File.ReadAllBytes(path);
 						}
-						catch {
-							wf = new WorkFile();
-						}
-						if(wf.data != null && wf.data.LongLength != 0) {
-							lock(access.queque) {
-								access.queque.Enqueue(wf);
-							}
-						}
+						catch { }
+#if UseThreadPool
+						ThreadPool.QueueUserWorkItem(WorkerThreadHasher, file);
+#else
+						if(file.data != null && file.data.LongLength != 0)
+							lock(access.queue)
+								access.queue.Enqueue(file);
+#endif
 					}
+
 				}
 			}
 			stillLoading = false;
+			while(true) {
+				bool abort = false;
+				for(int n=0;n<access.targets.Count&&!abort;n++) 
+					foreach(var f in access.targets[n].instances) 
+						if(f.Hashstate == Hashstate.queued || f.Hashstate == Hashstate.hashing) 
+							abort = true;
+				if(abort) {
+					running = 0;
+					return 0;
+				}
+				Thread.Sleep(100);				
+			}
+		}
+		List<DuplicateFile> FindDuplicatesT(int offset, List<NormalFile> files) {
+			running++;
+			var results = new List<DuplicateFile>();
+			for(int i = offset, stepsize = Environment.ProcessorCount; i < files.Count; i += stepsize, position++) {
+				var work = new DuplicateFile(files[i]);
+				for(var n = i + 1; n < files.Count; n++)
+					if(work.filename == files[n].filename)
+						work.instances.Add(files[n]);
+				if(work.instances.Count > 1)
+					results.Add(work);
+			}
+			return results;
 		}
 		/// <summary>
 		/// Analyze all normal files and find duplicate filenames
@@ -203,30 +235,52 @@ namespace NTFSDuplicateLinker {
 		///		reference for searching and output
 		/// </param>
 		void FindDuplicates(object transfer) {
-			position = 0;
 			var trans = (Tuple<List<DuplicateFile>, List<NormalFile>>) transfer;
-			var filePaths = trans.Item2;
-			for(var i = 0; i < filePaths.Count; i++, position++) {
-				var work = new DuplicateFile(filePaths[i]);
-				for(var n = i + 1; n < filePaths.Count; n++)
-					if(work.filename == filePaths[n].filename)
-						work.instances.Add(filePaths[n].fullpathID);
-				if(work.instances.Count > 1)
-					trans.Item1.Add(work);
+			var threads = new ThreadWithResult<List<DuplicateFile>, int, List<NormalFile>>[Environment.ProcessorCount];
+			for(var i = 0; i < Environment.ProcessorCount; i++, running++)
+				threads[i] = new ThreadWithResult<List<DuplicateFile>, int, List<NormalFile>>(FindDuplicatesT).Start(i, trans.Item2);
+			foreach(var t in threads) {
+				t.SleepTillCompletion();
+				trans.Item1.AddRange(t.Result);
+				running--;
 			}
 			running = 0;
 		}
+
 		/// <summary>
 		/// Sorts all <see cref="DuplicateFile.instances"/> of all <see cref="DuplicateFile"/>s using <see cref="DuplicateFile.Sort()"/>
 		/// </summary>
 		/// <param name="obj">List&lt;<see cref="DuplicateFile"/>&gt;</param>
 		void Sortall(object obj) {
+			var a = new int[Environment.ProcessorCount];
+			void SortThread(object o) {
+				var para = (ValueTuple<List<DuplicateFile>, int>) o;
+				var status = 0;
+				for(var d = para.Item2; d < para.Item1.Count; d++) {
+					a[para.Item2] = status;
+					para.Item1[d].Sort();
+					status++;
+				}
+				a[para.Item2] = status;
+				lock(this)
+					running--;
+			}
 			var dups = (List<DuplicateFile>) obj;
 			position = 0;
-			foreach(var dup in dups) {
-				dup.Sort();
-				position++;
+			var arr = new Thread[Environment.ProcessorCount];
+			for(var n = 0; n < Environment.ProcessorCount; n++) {
+				arr[n] = new Thread(SortThread);
+				arr[n].Start((dups, n));
+				lock(this)
+					running++;
 			}
+			while(running != 1) {
+				Thread.Sleep(100);
+				long results = 0;
+				foreach(var i in a) results += i;
+				position = results;
+			}
+			foreach(var t in arr) t.Join();
 			running = 0;
 		}
 		/// <summary>
@@ -238,36 +292,21 @@ namespace NTFSDuplicateLinker {
 			position = 0;
 			var ret = new List<DuplicateFile>();
 			foreach(var dup in duplicates) {
-				var options = new List<DuplicateFile>() {
-					new DuplicateFile(
-						new NormalFile(
-							pathStorage[dup.instances[0]],
-							dup.instances[0]
-						)
-					)
-				};
-				hashedFiles.TryGetValue(options[0].instances[0], out var tmp);
+				var options = new List<DuplicateFile>() { new DuplicateFile(dup.instances[0]) };
+				var tmp = options[0].instances[0].hash;
 				var hashes = new List<byte[]> { tmp };
 				for(var n = 1; n < dup.instances.Count; n++) {
 					var inst = dup.instances[n];
-					hashedFiles.TryGetValue(inst, out var myhash);
 					var found = false;
 					for(var i = 0; i < options.Count; i++) {
-						if(Util.CompareByteArray(hashes[i], myhash)) {
+						if(Util.CompareByteArray(hashes[i], inst.hash)) {
 							found = true;
 							options[i].instances.Add(inst);
 						}
 					}
 					if(!found) {
-						options.Add(
-							new DuplicateFile(
-								new NormalFile(
-									pathStorage[dup.instances[n]],
-									dup.instances[n]
-								)
-							)
-						);
-						hashes.Add(myhash);
+						options.Add(new DuplicateFile(dup.instances[n]));
+						hashes.Add(inst.hash);
 						position++;
 					}
 				}
@@ -296,21 +335,15 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <param name="file">The DuplicateFile to link into one</param>
 		static UInt64 LinkDuplicates(DuplicateFile file) {
-			UInt64 instanceSize;
-			try {
-				instanceSize = (ulong) new FileInfo(pathStorage[file.instances[0]]).Length;
-			}
-			catch {
-				return 0;
-			}
+			var instanceSize = (ulong) file.instances[0].Size;
 			UInt64 saved = 0;
 			file.instances.Sort();
 			var newExtension = ".DVSLINKER.BAK";
 			var prefix = @"\\?\";//allow unicode
-			var orig = prefix + pathStorage[file.instances[0]];
+			var orig = prefix + file.instances[0].Path;
 			var links = Util.GetLinks(file);
 			for(var n = 1; n < file.instances.Count; n++, links++) {
-				var curr = pathStorage[file.instances[n]];
+				var curr = file.instances[n].Path;
 				if(links >= 1023) {
 					orig = prefix + curr;
 					links = Util.GetLinks(curr) - 1;//for loops adds 1 back on
@@ -335,7 +368,8 @@ namespace NTFSDuplicateLinker {
 						continue;
 					}
 					saved++;
-					if(!Syscall.CreateHardLink(prefix + curr, orig, IntPtr.Zero)) {
+					if(false) {
+						//if(!Syscall.CreateHardLink(prefix + curr, orig, IntPtr.Zero)) {
 						var error = Syscall.GetLastError();//Marshal.GetLastWin32Error();
 						Debug.WriteLine("ERROR: " + error);
 						File.Copy(backup, curr);//restore backup
@@ -388,8 +422,7 @@ namespace NTFSDuplicateLinker {
 			foreach(var df in ldf) {
 				position++;
 				switcher = !switcher;
-				hashedFiles.TryGetValue(df.instances[0], out var myhash);
-				df.finalhash = myhash;
+				df.finalhash = df.instances[0].hash;
 				duplicates_view.Add(df);
 				if(s.ElapsedMilliseconds / 1000 >= 1) {
 					s.Restart();
@@ -403,7 +436,7 @@ namespace NTFSDuplicateLinker {
 		async void PositionWatcher(StatusPage cp) {
 			watchPosition = true;
 			while(watchPosition) {
-				cp.Number = position.ToString();
+				cp.Number = string.Format("{0:n0}", position); ;
 				await Task.Delay(66);
 			}
 		}
@@ -418,96 +451,74 @@ namespace NTFSDuplicateLinker {
 		/// <param name="path">Path to analyze. Does not have to be null checked</param>
 		/// <returns></returns>
 		async Task Analyzer(string path) {
-			if(
-				string.IsNullOrWhiteSpace(path) ||
-				!Directory.Exists(path) ||
-				!Util.IsOnNTFS(path)
-				) {
+			if(Util.isPathOK(path) != Chk.ok)
 				return;
-			}
-			pathStorage = new List<string>();
-			sizeStorage = new List<long>();
-			var files = new Queue<WorkFile>();
-			var filePaths = new List<NormalFile>();
+			var fileQueue = new Queue<NormalFile>();
+			var files = new List<NormalFile>();
 			var duplicates = new List<DuplicateFile>();
-			hashedFiles = new Dictionary<int, byte[]>();
 			async Task whileRunning(Action additional = null) {
 				while(running > 0) {
-					await Task.Delay(100);
+					await Task.Delay(50);
 					PBManager.UpdateCurrentPosition(position);
 					additional?.Invoke();
 				}
 			}
-
-
-			running = 1;
-			Debug.WriteLine("Scanning...");
-			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(path, filePaths));
 			var cp = (CurrentPage as StatusPage);
+			void reset(string sub, long v = 1) {
+				position = 0;
+				running = 1;
+				PBManager.Reset(1, (ulong) v);
+				cp.Subtitle = sub;
+			}
 			position = 0;
-			cp.Subtitle = "Files Discovered";
-			PositionWatcher();
-			await whileRunning();
-
-			PBManager.Reset(1, (ulong) filePaths.Count);
 			running = 1;
+			cp.Subtitle = "Files Discovered";
+			Debug.WriteLine("Scanning...");
+			ThreadPool.QueueUserWorkItem(Discover, new Tuple<string, List<NormalFile>>(path, files));
+			PositionWatcher();
+			while(running > 0) await Task.Delay(100);
+
+			reset("Files Analyzed", files.Count);
 			Debug.WriteLine("Identifying duplicates...");
 			ThreadPool.QueueUserWorkItem(
 				FindDuplicates,
-				new Tuple<List<DuplicateFile>, List<NormalFile>>(duplicates, filePaths));
-			position = 0;
-			cp.Subtitle = "Files Analyzed";
+				new Tuple<List<DuplicateFile>, List<NormalFile>>(duplicates, files));
 			await whileRunning();
-			filePaths.Clear();
-			Debug.WriteLine("Found:" + duplicates.Count + " duplicates in " + filePaths.Count + " Files");
-			PBManager.Reset(1, (ulong) duplicates.Count);
+			files.Clear();
+			Debug.WriteLine("Found:" + duplicates.Count + " duplicates in " + files.Count + " Files");
 
+			reset("Files Hashed", duplicates.Count);
 			stillLoading = true;
-			running = 1;
-			ThreadPool.QueueUserWorkItem(MemoryMonitor);
-			ThreadPool.QueueUserWorkItem(
-				Reader,
-				new HandoverObject() {
-					queque = files,
-					targets = duplicates,
-					results = hashedFiles
-				}
-			);
-			for(short n = 0; n < Config.HASHTHREADS; n++, running++)
-				ThreadPool.QueueUserWorkItem(
-					HashAsync,
-					new HandoverObject() {
-						queque = files,
-						targets = duplicates,
-						results = hashedFiles
-					}
-				);
-			position = 0;
-			cp.Subtitle = "Files Hashed";
-			await whileRunning();
-			Debug.WriteLine("Computed:" + hashedFiles.Count + " Hashes!");
-			running = 1;
-			PBManager.Reset(1, (ulong) duplicates.Count);
-			position = 0;
-			cp.Subtitle = "Files Sorted";
+			new Thread(MemoryMonitor).Start();
+			new ThreadWithResult<int, HandoverObject>(Reader).Start(new HandoverObject(fileQueue, duplicates));
+#if UseThreadPool
+#else
+				for(short n = 1; n < Environment.ProcessorCount; n++, running++)
+				new ThreadWithResult<int, HandoverObject>(HashAsync).Start(new HandoverObject(fileQueue, duplicates));
+#endif
+			await whileRunning(() => Title = string.Format("{0:n0}", usedMemory));
+			Debug.WriteLine("Computed:" + hashedFiles + " Hashes!");
+
+			await Task.Delay(100);
+			reset("Files Sorted", duplicates.Count);
 			ThreadPool.QueueUserWorkItem(Sortall, duplicates);
 			await whileRunning();
 			Debug.WriteLine("Possible Duplicates Sorted!");
-			PBManager.Reset(1, 1);
-			position = 0;
-			cp.Subtitle = "Rough-Matched Duplicates";
+
+			reset("Rough-Matched Duplicates", duplicates.Count);
 			finalDuplicates = (await new ThreadWithResult<List<DuplicateFile>, List<DuplicateFile>>(FinalDuplicates).Start(duplicates).WaitTillCompletion()).Result;
 			duplicates.Clear();
 			Debug.WriteLine("Identified final Duplicates. found: " + finalDuplicates.Count);
-			PBManager.Reset(1, 1);
-			position = 0;
-			cp.Subtitle = "Validated Results";
+
+			reset("Validated Results", finalDuplicates.Count);
 			finalDuplicates = (await new ThreadWithResult<List<DuplicateFile>, List<DuplicateFile>>(CleanupDuplicates).Start(finalDuplicates).WaitTillCompletion()).Result;
 			Debug.WriteLine("Removed Lonely Files. final count: " + finalDuplicates.Count);
-			PBManager.Reset(1, (ulong) finalDuplicates.Count);
+
+
 			//lbSBDuplicates.Content = finalDuplicates.Count;
 			watchPosition = false;
-			cp.Subtitle = "";
+			await Task.Delay(33);
+			reset("", finalDuplicates.Count);
 			cp.Number = "Rendering Results";
 			await DisplayDuplicates(finalDuplicates);
 			//btLink.IsEnabled = true;
@@ -550,18 +561,18 @@ namespace NTFSDuplicateLinker {
 		private async void BtNext_Click(object sender, RoutedEventArgs e) {
 			if(CurrentPage is PathPage pp) {
 				var path = pp.Path;
-				var result = pp.Validate(path);
+				var result = Util.isPathOK(path);
 				switch(result) {
-					case PathPage.Chk.empty:
+					case Chk.empty:
 						MessageBox.Show("Please enter a Path");
 						break;
-					case PathPage.Chk.gone:
+					case Chk.gone:
 						MessageBox.Show("Directory not found");
 						break;
-					case PathPage.Chk.notNTFS:
+					case Chk.notNTFS:
 						MessageBox.Show("The Directory is not on a NTFS Drive. File linking is only avaliable on NTFS", "Invalid Filesystem");
 						break;
-					case PathPage.Chk.ok:
+					case Chk.ok:
 						CurrentPage = new StatusPage();
 						btNext.Visibility = Visibility.Hidden;
 						await Task.Delay(100);
@@ -587,8 +598,6 @@ namespace NTFSDuplicateLinker {
 		}
 
 		private void BtBack_Click(object sender, RoutedEventArgs e) {
-			pathStorage.Clear();
-			hashedFiles.Clear();
 			finalDuplicates.Clear();
 			duplicates_view.Clear();
 			GC.Collect();

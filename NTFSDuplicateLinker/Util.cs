@@ -1,6 +1,8 @@
 ﻿using System.IO;
 
 namespace NTFSDuplicateLinker {
+	public enum Hashstate { nonexsistant, queued, hashing, done };
+	public enum Chk { empty, gone, notNTFS, ok }
 	static class Util {
 		/// <summary>
 		/// True if DirectoryInfo is Junction
@@ -22,14 +24,14 @@ namespace NTFSDuplicateLinker {
 		/// <param name="path"></param>
 		/// <returns>True if Path is contained in a Junction</returns>
 		public static bool AnalyzePathForJunctions(string path) {
-			if (AnalyzeDirectoryForJunctions(path))
+			if(AnalyzeDirectoryForJunctions(path))
 				return true;
 			var dir = Directory.GetParent(path);
 			do {
-				if (AnalyzeDIForJunctions(dir))
+				if(AnalyzeDIForJunctions(dir))
 					return true;
 				dir = Directory.GetParent(dir.FullName);
-			} while (dir != null);
+			} while(dir != null);
 			return false;
 		}
 		/// <summary>
@@ -37,12 +39,12 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <returns></returns>
 		public static bool CompareByteArray(byte[] a, byte[] b) {
-			if (a == null || b == null)
+			if(a == null || b == null)
 				return false;
-			if (a.LongLength != b.LongLength)
+			if(a.LongLength != b.LongLength)
 				return false;
-			for (long n = 0; n < a.LongLength; n++)
-				if (a[n] != b[n])
+			for(long n = 0; n < a.LongLength; n++)
+				if(a[n] != b[n])
 					return false;
 			return true;
 		}
@@ -53,8 +55,10 @@ namespace NTFSDuplicateLinker {
 		/// <returns></returns>
 		public static uint GetLinks(string filePath) {
 			//try {
-			using (var f = new FileStream(filePath, FileMode.Open, FileAccess.Read)) {
+			using(var f = new FileStream(filePath, FileMode.Open, FileAccess.Read)) {
+#pragma warning disable CS0618 // Typ oder Element ist veraltet
 				Syscall.GetFileInformationByHandle(f.Handle, out var info);
+#pragma warning restore CS0618 // Typ oder Element ist veraltet
 				return info.NumberOfLinks;
 			}
 			//}
@@ -67,7 +71,7 @@ namespace NTFSDuplicateLinker {
 		/// </summary>
 		/// <param name="df">DuplicateFile to analyze</param>
 		/// <returns></returns>
-		public static uint GetLinks(DuplicateFile df) => GetLinks(MainWindow.pathStorage[df.instances[0]]);
+		public static uint GetLinks(DuplicateFile df) => GetLinks(df.instances[0].Path);
 		/// <summary>
 		/// Analyzes if a path is on a NTFS formatted drive
 		/// </summary>
@@ -76,17 +80,15 @@ namespace NTFSDuplicateLinker {
 		public static bool IsOnNTFS(string path) {
 			var drives = DriveInfo.GetDrives();
 			var inputDriveName = Path.GetPathRoot(new FileInfo(path).FullName).Substring(0, 3);
-			foreach (DriveInfo d in drives)
-				if (d.Name == inputDriveName)
+			foreach(var d in drives)
+				if(d.Name == inputDriveName)
 					return d.DriveFormat == "NTFS";
 			return false;
 		}
-		/// <summary>
-		/// Ensures that a path is safe to use and on NTFS
-		/// </summary>
-		/// <param name="path"></param>
-		/// <returns></returns>
-		public static bool IsPathOK(string path) =>
-			!string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && IsOnNTFS(path);
+		public static Chk isPathOK(string path) {
+			return string.IsNullOrWhiteSpace(path)
+				? Chk.empty
+				: !Directory.Exists(path) ? Chk.gone : !Util.IsOnNTFS(path) ? Chk.notNTFS : Chk.ok; ;
+		}
 	}
 }

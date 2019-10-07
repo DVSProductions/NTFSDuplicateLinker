@@ -15,14 +15,14 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		/// Higher memory -> higher loading speed
 		/// </summary>
-		public static readonly long MAXMEMORYUSAGE= 6_000_000_000L;
+		public static readonly long MAXMEMORYUSAGE= 7_000_000_000L;
 		/// <summary>
 		///		Memory usage must be under this value to stop <see cref="MainWindow.HashAsync(object)"/> from panicking
 		/// <para>
 		///		default: 400MB (400.000.000L)
 		/// </para>
 		/// </summary>
-		public static readonly long MINMEMORYUSAGE = 400_000_000L;
+		public static readonly long MINMEMORYUSAGE = 1_000_000_000L;
 		/// <summary>
 		/// If this value is exceeded <see cref="MainWindow.HashAsync(object)"/> will decrease Hashing delays
 		/// <para>
@@ -30,7 +30,7 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		/// Allows for a more responsive UI and fewer lock Instructions while loading and memory is below <see cref="OKMEMORYUSAGE"/>
 		/// </summary>
-		public static readonly long OKMEMORYUSAGE = 1_000_000_000L;		
+		public static readonly long OKMEMORYUSAGE = 3_000_000_000L;		
 		/// <summary>
 		/// Polling frequency of <see cref="MainWindow.MemoryMonitor(object)"/>
 		/// <para>
@@ -39,7 +39,7 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		/// default: 250ms (250)
 		/// </summary>
-		public static readonly int MEMORYMONITORDELAY = 250;
+		public static readonly int MEMORYMONITORDELAY = 100;
 		/// <summary>
 		/// Hashing interval when <see cref="OKMEMORYUSAGE"/> is not exceeded 
 		/// nor <see cref="MainWindow.HashAsync(object)"/> is panicking
@@ -47,7 +47,7 @@ namespace NTFSDuplicateLinker
 		///		default: 100ms (100)
 		/// </para>
 		/// </summary>
-		public static readonly int HASHASYNCREGDELAY = 100;
+		public static readonly int HASHASYNCREGDELAY = 150;
 		/// <summary>
 		/// Hashing interval when <see cref="OKMEMORYUSAGE"/> is exceeded 
 		/// but <see cref="MainWindow.HashAsync(object)"/> isn't panicking yet
@@ -71,6 +71,6 @@ namespace NTFSDuplicateLinker
 		/// </para>
 		///	default: 4 threads (4)
 		/// </summary>
-		public static readonly short HASHTHREADS = 4;
+		public static readonly short HASHTHREADS = 6;
 	}
 }

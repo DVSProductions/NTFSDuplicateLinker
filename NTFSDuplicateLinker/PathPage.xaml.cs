@@ -25,15 +25,9 @@ namespace NTFSDuplicateLinker {
 			if(e.Key == System.Windows.Input.Key.Enter)
 				onEnter();
 		}
-		public enum Chk { empty, gone, notNTFS, ok }
 		Chk result;
 		public string Path => tbPath.Text;
-		public Chk Validate(string path) {
-			return string.IsNullOrWhiteSpace(path)
-				? Chk.empty
-				: !Directory.Exists(path) ? Chk.gone : !Util.IsOnNTFS(path) ? Chk.notNTFS : Chk.ok; ;
-		}
-		void ValidateThread(object o) => result = Validate(o as string);
+		void ValidateThread(object o) => result = Util.isPathOK(o as string);
 
 		async void SearchForPath() {
 
