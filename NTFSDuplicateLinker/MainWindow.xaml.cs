@@ -93,18 +93,22 @@ namespace NTFSDuplicateLinker {
 			usedMemory = 0;
 		}
 		static int hashedFiles;
+		
 #if UseThreadPool
 		void WorkerThreadHasher(object target) {
-			if(target is NormalFile work)
-				if(work.Hashstate == Hashstate.queued) {
+			try {
+				if(target is NormalFile work && work.Hashstate == Hashstate.queued) {
 					work.Hashstate = Hashstate.hashing;
 					using(var hasher = MD5.Create()) {
 						work.hash = hasher.ComputeHash(work.data);
 						work.data = null;
-						hashedFiles++;
 					}
 					work.Hashstate = Hashstate.done;
 				}
+			}
+			catch { }
+			//lock()
+			hashedFiles++;
 		}
 #else
 		/// <summary>
@@ -155,7 +159,6 @@ namespace NTFSDuplicateLinker {
 		static bool HashSync(NormalFile file) {
 			if(file.Hashstate == Hashstate.hashing) return false;
 			file.Hashstate = Hashstate.hashing;
-			MessageBox.Show("Doing Sync");
 			using(var hasher = MD5.Create()) {
 				using(var fs = File.OpenRead(file.Path)) {
 					if(fs.Length == 0) {
@@ -164,17 +167,19 @@ namespace NTFSDuplicateLinker {
 						return false;
 					}
 					file.hash = hasher.ComputeHash(fs);
-					hashedFiles++;
+					//hashedFiles++;
 					file.Hashstate = Hashstate.done;
 					return true;
 				}
 			}
 		}
+		long queued;
 		/// <summary>
 		/// Loads all identified duplicates into Memory for hashing by <see cref="HashAsync(object)"/>
 		/// </summary>
 		/// <param name="obj"><see cref="HandoverObject"/> containing the required references</param>
 		int Reader(HandoverObject access) {
+			queued = 0;
 			foreach(var dup in access.targets) {
 				position++;
 				foreach(var file in dup.instances) {
@@ -182,14 +187,17 @@ namespace NTFSDuplicateLinker {
 					file.Hashstate = Hashstate.queued;
 					var path = file.Path;
 					//check for huge size
-					if(file.Size > Config.MAXIMUMASYNCFILESIZE)
+					if(file.Size > Config.MAXIMUMASYNCFILESIZE) {
+						//if(HashSync(file)) queued++;
 						HashSync(file);
+					}
 					else {
 						try {
 							file.data = File.ReadAllBytes(path);
 						}
 						catch { }
 #if UseThreadPool
+						queued++;
 						ThreadPool.QueueUserWorkItem(WorkerThreadHasher, file);
 #else
 						if(file.data != null && file.data.LongLength != 0)
@@ -201,18 +209,11 @@ namespace NTFSDuplicateLinker {
 				}
 			}
 			stillLoading = false;
-			while(true) {
-				bool abort = false;
-				for(int n=0;n<access.targets.Count&&!abort;n++) 
-					foreach(var f in access.targets[n].instances) 
-						if(f.Hashstate == Hashstate.queued || f.Hashstate == Hashstate.hashing) 
-							abort = true;
-				if(abort) {
-					running = 0;
-					return 0;
-				}
-				Thread.Sleep(100);				
+			while(hashedFiles <1113) {
+				Thread.Sleep(100);
 			}
+			running = 0;
+			return 0;
 		}
 		List<DuplicateFile> FindDuplicatesT(int offset, List<NormalFile> files) {
 			running++;
@@ -496,7 +497,7 @@ namespace NTFSDuplicateLinker {
 				for(short n = 1; n < Environment.ProcessorCount; n++, running++)
 				new ThreadWithResult<int, HandoverObject>(HashAsync).Start(new HandoverObject(fileQueue, duplicates));
 #endif
-			await whileRunning(() => Title = string.Format("{0:n0}", usedMemory));
+			await whileRunning(() => Title = string.Format("{0:n0} vs {1:n0}   Remaining: {2:n0}", hashedFiles, queued,queued-hashedFiles));
 			Debug.WriteLine("Computed:" + hashedFiles + " Hashes!");
 
 			await Task.Delay(100);
