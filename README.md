@@ -1,5 +1,5 @@
 # NTFSDuplicateLinker
-Finds duplicate files in a NFTS folder structure and links them togehter using hardlinks to save diskspace
+Finds duplicate files in a NTFS folder structure and links them togehter using hardlinks to save diskspace
 
 # Principle of Operation
 The program looks for any files with the same name and MD5 hash.
